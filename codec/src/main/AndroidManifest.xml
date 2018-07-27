@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.miracles.codec.camera">
+
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+</manifest>

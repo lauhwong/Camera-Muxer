@@ -1,0 +1,2 @@
+include ':app', ':codec', ':camera'
+rootProject.name='Camera&Muxer'

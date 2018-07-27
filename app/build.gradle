@@ -1,0 +1,55 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
+
+android {
+    compileSdkVersion 27
+    defaultConfig {
+        applicationId "com.miracles.mediacodec"
+        minSdkVersion 18
+        targetSdkVersion 27
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+}
+configurations.all {
+    resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
+}
+project.android.applicationVariants.all { variant ->
+    def parentFile = file('../demo')
+    def apkName = 'CameraMuxer'
+    tasks.all {
+        if ("assemble${variant.name.capitalize()}".equalsIgnoreCase(it.name)) {
+            it.doLast {
+                copy {
+                    from variant.outputs[0].outputFile
+                    into parentFile.absolutePath
+                    rename { String fileName ->
+                        "${apkName}.apk"
+                    }
+                }
+            }
+        }
+    }
+}
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jre7:$kotlin_version"
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.android.support.constraint:constraint-layout:1.1.2'
+    testImplementation 'junit:junit:4.12'
+    androidTestImplementation 'com.android.support.test:runner:1.0.2'
+    androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
+    implementation project(':codec')
+//    implementation 'com.github.lauhwong:cameraview-muxer:0.4-SNAPSHOT'
+    implementation 'com.yqritc:android-scalablevideoview:1.0.4'
+}
