@@ -2,5 +2,6 @@
 <resources>
     <declare-styleable name="CameraView">
         <attr name="android:adjustViewBounds"/>
+        <attr name="enableCamera2" format="boolean"/>
     </declare-styleable>
 </resources>

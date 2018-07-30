@@ -2,12 +2,10 @@ package com.miracles.mediacodec
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
-import com.miracles.camera.CameraFunctions
-import com.miracles.camera.CameraView
-import com.miracles.camera.ChooseSizeStrategy
-import com.miracles.camera.logMED
+import com.miracles.camera.*
 import com.miracles.codec.camera.AudioDevice
 import com.miracles.codec.camera.CapturePictureHandler
 import com.miracles.codec.camera.Mp4Muxer
@@ -46,7 +44,8 @@ class CameraActivity : BaseActivity() {
         cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE,
                 getRecordStrategy())
         //mp4Callback
-        cameraView.addCallback(object : MMP4MuxerHandler(this, getSavedDir()) {
+        val discardThreshold = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) 3 else 10
+        cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir(),discardThreshold) {
             override fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
                 super.onStopRecordingFrame(cameraView, timeStampInNs)
                 PreviewActivity.start(this@CameraActivity, mMp4Path, false)
@@ -66,13 +65,21 @@ class CameraActivity : BaseActivity() {
         val display = resources.displayMetrics
         logMED("display width=${display.widthPixels} ,height=${display.heightPixels}")
         val aspectRatio = display.heightPixels.toFloat() / display.widthPixels
-        return ChooseSizeStrategy.AspectRatioStrategy(aspectRatio, (1080 * aspectRatio).toInt(), 1080)
+        return object : ChooseSizeStrategy.AspectRatioStrategy(aspectRatio, (1080 * aspectRatio).toInt(), 1080) {
+            override fun bytesPoolSize(size: Size): Int {
+                return when {
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> 8
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> 12
+                    else -> 15
+                }
+            }
+        }
     }
 
     /**
      * Mp4 record handler .path
      */
-    private open class MMP4MuxerHandler(val ctx: Context, val dir: File) : Mp4MuxerHandler() {
+    private open class MMP4MuxerHandler(val ctx: Context, val dir: File, discardThreshold: Int) : Mp4MuxerHandler(discardThreshold) {
         override fun createMp4Muxer(frameWidth: Int, frameHeight: Int): Mp4Muxer {
             val path = File(dir, "me.mp4").absolutePath
             val mp4Param = Mp4Muxer.Params().apply {

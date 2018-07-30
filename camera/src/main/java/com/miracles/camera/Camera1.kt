@@ -260,7 +260,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
             val maxFactor = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).bytesPoolSize(com.miracles.camera.Size(previewSize.width, previewSize.height))
             if (mPreviewBytesPool.perSize != sizeInByte) {
                 mPreviewBytesPool.clear()
-                mPreviewBytesPool = ByteArrayPool(sizeInByte * maxFactor, sizeInByte, maxFactor)
+                mPreviewBytesPool = ByteArrayPool(maxFactor, sizeInByte, maxFactor)
             } else {
                 mPreviewBytesPool.initialize(maxFactor)
             }

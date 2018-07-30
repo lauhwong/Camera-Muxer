@@ -10,8 +10,7 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
         val EMPTY = ByteArrayPool(0, 1)
     }
 
-    private val mMaxPoolSize = maxSize / perSize
-    private val mPool = ArrayDeque<ByteArray>(mMaxPoolSize)
+    private val mPool = ArrayDeque<ByteArray>(maxSize)
 
     constructor(maxSize: Int, perSize: Int, factor: Int) : this(maxSize, perSize) {
         initialize(factor)
@@ -35,7 +34,7 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     fun releaseBytes(bytes: ByteArray): Boolean {
         if (bytes.size != perSize) return false
         synchronized(mPool) {
-            if (mPool.size < mMaxPoolSize) {
+            if (mPool.size < maxSize) {
                 mPool.offer(bytes)
                 return true
             }
@@ -54,14 +53,14 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
         if (other !is ByteArrayPool) return false
 
         if (perSize != other.perSize) return false
-        if (mMaxPoolSize != other.mMaxPoolSize) return false
+        if (maxSize != other.maxSize) return false
 
         return true
     }
 
     override fun hashCode(): Int {
         var result = perSize
-        result = 31 * result + mMaxPoolSize
+        result = 31 * result + maxSize
         return result
     }
 

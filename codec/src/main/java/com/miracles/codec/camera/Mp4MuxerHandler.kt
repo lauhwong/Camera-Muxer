@@ -1,10 +1,13 @@
 package com.miracles.codec.camera
 
+import android.annotation.SuppressLint
 import android.graphics.ImageFormat
 import com.miracles.camera.ByteArrayPool
 import com.miracles.camera.CameraFunctions
 import com.miracles.camera.CameraView
 import com.miracles.camera.logMED
+import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.locks.ReentrantLock
 
@@ -21,11 +24,45 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     protected var mMp4Width = 0
     protected var mMp4Height = 0
     private var mRecordFrame = 0
+    @SuppressLint("UseSparseArrays")
     private val mAudioBytesCache = HashMap<Int, MutableList<AudioCache>>()
     private val mAudioInputLock = ReentrantLock(true)
     private var mReleased = AtomicBoolean(false)
+    private var mDiscardFrame = false
+    private val mDiscardFrameThreshold: Int
+    private var mLastCheckFrameDiscardTime = 0L
 
-    private data class AudioCache(val bytes: ByteArray, val len: Int, val timeStampInNs: Long)
+    companion object {
+        private const val DISCARD_FRAME_THRESHOLD = 10
+    }
+
+    constructor() : this(DISCARD_FRAME_THRESHOLD)
+    /**
+     * discard frame if [compressed time> (1e9/fps)] per  discardFrameThreshold
+     */
+    constructor(discardFrameThreshold: Int) {
+        mDiscardFrameThreshold = discardFrameThreshold
+    }
+
+    private data class AudioCache(val bytes: ByteArray, val len: Int, val timeStampInNs: Long) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is AudioCache) return false
+
+            if (!Arrays.equals(bytes, other.bytes)) return false
+            if (len != other.len) return false
+            if (timeStampInNs != other.timeStampInNs) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = Arrays.hashCode(bytes)
+            result = 31 * result + len
+            result = 31 * result + timeStampInNs.hashCode()
+            return result
+        }
+    }
 
     override fun audioRecording(data: ByteArray, len: Int, timeStampInNs: Long) {
         val timeStamp = timeStampInNs - mStartTimeStamp
@@ -63,6 +100,8 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mStartTimeStamp = timeStampInNs
         mRecordFrame = 0
         mRecordingTimeStamp = 0
+        mDiscardFrame = false
+        mLastCheckFrameDiscardTime = 0
         //start muxer
         mMuxer.start()
         //start audio device
@@ -70,26 +109,55 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMp4Muxer.mAudioDevice.start()
     }
 
-    override fun onFrameRecording(cameraView: CameraView, data: ByteArray, len: Int, bytesPool: ByteArrayPool, width: Int, height: Int, format: Int,
+    override fun onFrameRecording(cameraView: CameraView, frameBytes: CameraView.FrameBytes, width: Int, height: Int, format: Int,
                                   orientation: Int, facing: Int, timeStampInNs: Long) {
-        val start = System.currentTimeMillis()
-        var codeFormat = LibYuvUtils.FOURCC_NV21
-        if (format == ImageFormat.YUV_420_888) {
-            codeFormat = LibYuvUtils.FOURCC_I420
-        } else if (format == ImageFormat.YV12) {
-            codeFormat = LibYuvUtils.FOURCC_YV12
-        }
-        val compressed = compress(data, len, orientation, facing, width, height, codeFormat, mMp4Muxer.mSupportDeprecated420)
+        val start = System.nanoTime()
         val fps = mMp4Muxer.params.fps
-        //timeStampInNs - mStartTimeStamp
-        ++mRecordFrame
-        mRecordingTimeStamp += (1e9 / fps).toLong()
-        mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
-        mCompressBytesPool.releaseBytes(compressed)
-        if (mRecordFrame % fps == 0) {
-            consumeAudioInput(mRecordFrame / fps, Long.MAX_VALUE, false)
+        val fpsGapInNs = (1e9 / fps).toLong()
+        if (mDiscardFrame) {
+            mDiscardFrame = false
+        } else {
+            if (mLastCheckFrameDiscardTime == 0L) {
+                mLastCheckFrameDiscardTime = start
+            } else {
+                val checkDiscardGap = fps / mDiscardFrameThreshold
+                if (mRecordFrame % checkDiscardGap == 0) {
+                    val elapsed = System.nanoTime() - mLastCheckFrameDiscardTime
+                    mDiscardFrame = elapsed > checkDiscardGap * 1e9 / (fps - frameBytes.bytesPool.maxSize)
+                    mLastCheckFrameDiscardTime = System.nanoTime()
+                }
+            }
         }
-        logMED("onFrameRecording cost ${System.currentTimeMillis() - start}ms !")
+        try {
+            val data = frameBytes.datas
+            if (mDiscardFrame) {
+                logMED("onFrameRecording discard this frame...")
+                return
+            }
+            //1.compress data to code
+            var codeFormat = LibYuvUtils.FOURCC_NV21
+            if (format == ImageFormat.YUV_420_888) {
+                codeFormat = LibYuvUtils.FOURCC_I420
+            } else if (format == ImageFormat.YV12) {
+                codeFormat = LibYuvUtils.FOURCC_YV12
+            }
+            val compressed = compress(data, data.size, orientation, facing, width, height, codeFormat, mMp4Muxer.mSupportDeprecated420)
+            //2.release bytes.
+            frameBytes.bytesPool.releaseBytes(data)
+            frameBytes.released = true
+            //3.code compressed data to Mp4.
+            //timeStampInNs - mStartTimeStamp
+            ++mRecordFrame
+            mRecordingTimeStamp += fpsGapInNs
+            mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
+            mCompressBytesPool.releaseBytes(compressed)
+            if (mRecordFrame % fps == 0) {
+                consumeAudioInput(mRecordFrame / fps, Long.MAX_VALUE, false)
+            }
+        } finally {
+            val consumedInNs = System.nanoTime() - start
+            logMED("onFrameRecording cost ${TimeUnit.NANOSECONDS.toMillis(consumedInNs)} ms ,DiscardFrame=$mDiscardFrame! ,mRecordFrame=$mRecordFrame")
+        }
     }
 
     private fun consumeAudioInput(timeInSN: Int, maxTimeInNs: Long, endOfInput: Boolean) {
@@ -114,7 +182,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                          width: Int, height: Int, format: Int, supportI420: Boolean): ByteArray {
         if (mCompressBytesPool == ByteArrayPool.EMPTY) {
             val size = mMp4Width * mMp4Height * 3 / 2
-            mCompressBytesPool = ByteArrayPool(size * 2, size)
+            mCompressBytesPool = ByteArrayPool(2, size)
         }
         val bf = mCompressBytesPool.getBytes()
         val rotation = LibYuvUtils.ROTATION_90 * orientation / 90

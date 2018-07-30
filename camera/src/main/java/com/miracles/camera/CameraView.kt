@@ -14,6 +14,7 @@ import com.miracles.camera.CameraFunctions.Companion.SIZE_PREVIEW
 import com.miracles.camera.CameraFunctions.Companion.STRATEGY_PICTURE_SIZE
 import com.miracles.camera.CameraFunctions.Companion.STRATEGY_PREVIEW_SIZE
 import com.miracles.camera.CameraFunctions.Companion.STRATEGY_RECORD_PREVIEW_SIZE
+import java.util.*
 
 /**
  * Created by lxw
@@ -40,16 +41,24 @@ class CameraView : FrameLayout {
         initView(context, attrs)
     }
 
+    @SuppressLint("NewApi")
     private fun initView(ctx: Context, attrs: AttributeSet?) {
         if (isInEditMode) return
+        //Attrs
+        val a = context.obtainStyledAttributes(attrs, R.styleable.CameraView)
+        mAdjustBounds = a.getBoolean(R.styleable.CameraView_android_adjustViewBounds, false)
+        val enableCamera2 = a.getBoolean(R.styleable.CameraView_enableCamera2, false)
+        a.recycle()
         previewImpl = createCameraPreview()
         mCallbacks = CameraCallbackBridge(this)
-        if (Build.VERSION.SDK_INT < 21) {
-            mDeviceImpl = Camera1(previewImpl, mCallbacks)
-        } else if (Build.VERSION.SDK_INT < 23) {
-            mDeviceImpl = Camera2(previewImpl, ctx, mCallbacks)
+        mDeviceImpl = if (enableCamera2) {
+            when {
+                Build.VERSION.SDK_INT < 21 -> Camera1(previewImpl, mCallbacks)
+                Build.VERSION.SDK_INT < 23 -> Camera2(previewImpl, ctx, mCallbacks)
+                else -> Camera2Api23(previewImpl, ctx, mCallbacks)
+            }
         } else {
-            mDeviceImpl = Camera2Api23(previewImpl, ctx, mCallbacks)
+            Camera1(previewImpl, mCallbacks)
         }
         mDisplayOrientationDetector = object : DisplayOrientationDetector(ctx) {
             override fun onDisplayOrientationChanged(displayOrientation: Int) {
@@ -59,10 +68,7 @@ class CameraView : FrameLayout {
                 }
             }
         }
-        //Attrs
-        val a = context.obtainStyledAttributes(attrs, R.styleable.CameraView)
-        mAdjustBounds = a.getBoolean(R.styleable.CameraView_android_adjustViewBounds, false)
-        a.recycle()
+
     }
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -327,10 +333,32 @@ class CameraView : FrameLayout {
          */
         fun onStartRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {}
 
-        fun onFrameRecording(cameraView: CameraView, data: ByteArray, len: Int, bytesPool: ByteArrayPool, width: Int, height: Int, format: Int,
+        fun onFrameRecording(cameraView: CameraView, frameBytes: FrameBytes, width: Int, height: Int, format: Int,
                              orientation: Int, facing: Int, timeStampInNs: Long) {
         }
 
         fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {}
+    }
+
+    data class FrameBytes(val datas: ByteArray, val len: Int, val bytesPool: ByteArrayPool, var released: Boolean) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is FrameBytes) return false
+
+            if (!Arrays.equals(datas, other.datas)) return false
+            if (len != other.len) return false
+            if (bytesPool != other.bytesPool) return false
+            if (released != other.released) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = Arrays.hashCode(datas)
+            result = 31 * result + len
+            result = 31 * result + bytesPool.hashCode()
+            result = 31 * result + released.hashCode()
+            return result
+        }
     }
 }

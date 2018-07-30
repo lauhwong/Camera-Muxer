@@ -95,7 +95,7 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
                 val v = planes[2].buffer
                 val ySize = y.remaining()
                 if (mPreviewBytesPool == ByteArrayPool.EMPTY) {
-                    mPreviewBytesPool = ByteArrayPool(ySize * 3 / 2 * 5, ySize * 3 / 2)
+                    mPreviewBytesPool = ByteArrayPool(5, ySize * 3 / 2)
                 }
                 //copy uncompressed yuv data ...
                 val bytes = mPreviewBytesPool.getBytes()

@@ -12,7 +12,7 @@ interface ChooseSizeStrategy : Parcelable {
 
     fun chooseSize(preview: CameraPreview, displayOrientation: Int, cameraSensorOrientation: Int, facing: Int, sizes: List<Size>): Size
 
-    fun bytesPoolSize(size: Size) = 8
+    fun bytesPoolSize(size: Size) = 6
 
     open class LargestSizeStrategy() : ChooseSizeStrategy {
         constructor(parcel: Parcel) : this() {

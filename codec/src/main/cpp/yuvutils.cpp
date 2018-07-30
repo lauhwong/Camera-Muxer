@@ -118,23 +118,29 @@ jint Java_com_miracles_codec_camera_LibYuvUtils_scaleRotationAndMirrorToI420
                 res = libyuv::I420Mirror(temp_scale_y, scaleYStride, temp_scale_u, scaleUStride, temp_scale_v, scaleVStride,
                                          result_y, scaleYStride, result_u, scaleUStride, result_v, scaleVStride, scaleWidth, scaleHeight);
             }
-            delete []temp_scale_buf;
+            delete[]temp_scale_buf;
         } else {
             res = libyuv::I420Scale(temp_src_y, yStride, temp_src_u, uStride, temp_src_v, vStride, convertDstWidth, convertDstHeight,
                                     result_y, scaleYStride, result_u, scaleUStride, result_v, scaleVStride, scaleWidth, scaleHeight,
                                     ToFilterMode(jScaleMode));
         }
     }
-    delete []temp_src_buf;
-    env->ReleaseByteArrayElements(jSamples, reinterpret_cast<jbyte *>(sample_buf), JNI_COMMIT);
-    env->ReleaseByteArrayElements(jResultBuf, reinterpret_cast<jbyte *>(result_buf), JNI_COMMIT);
+    delete[]temp_src_buf;
+    env->ReleaseByteArrayElements(jSamples, reinterpret_cast<jbyte *>(sample_buf), 0);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+    env->ReleaseByteArrayElements(jResultBuf, reinterpret_cast<jbyte *>(result_buf), 0);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
     if (res >= 0)return predict_size; else return 0;
 }
 
 JNIEXPORT
 JNICALL
 jint Java_com_miracles_codec_camera_LibYuvUtils_i420ToNV12(JNIEnv *env, jclass jClz, jbyteArray jSamples,
-                                                     jint jSampleSize, jbyteArray jDst, jint jWidth, jint jHeight) {
+                                                           jint jSampleSize, jbyteArray jDst, jint jWidth, jint jHeight) {
     jsize predict_size = jWidth * jHeight * 3 / 2;
     jsize result_buf_size = env->GetArrayLength(jDst);
     if (result_buf_size < predict_size) {
@@ -147,8 +153,14 @@ jint Java_com_miracles_codec_camera_LibYuvUtils_i420ToNV12(JNIEnv *env, jclass j
     uint8_t *src_u = src_y + jWidth * jHeight;
     uint8_t *src_v = src_u + jWidth * jHeight / 4;
     jint res = libyuv::I420ToNV12(src_y, jWidth, src_u, jWidth / 2, src_v, jWidth / 2, dst, jWidth, dst + jWidth * jHeight, jWidth / 1, jWidth, jHeight);
-    env->ReleaseByteArrayElements(jSamples, reinterpret_cast<jbyte *>(src), JNI_COMMIT);
-    env->ReleaseByteArrayElements(jDst, reinterpret_cast<jbyte *>(dst), JNI_COMMIT);
+    env->ReleaseByteArrayElements(jSamples, reinterpret_cast<jbyte *>(src), 0);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+    env->ReleaseByteArrayElements(jDst, reinterpret_cast<jbyte *>(dst), 0);
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
     if (res >= 0)return predict_size; else return 0;
 }
 

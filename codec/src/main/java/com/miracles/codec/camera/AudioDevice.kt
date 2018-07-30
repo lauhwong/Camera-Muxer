@@ -18,7 +18,7 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
     private var mRecordThread: Thread? = null
     private val mPoolFactor = 100
     //Note:do not initialized for bufSize...cause bug below 21....
-    private val mByteArrayPool: ByteArrayPool = ByteArrayPool(2048 * mPoolFactor, 2048)
+    private val mByteArrayPool: ByteArrayPool = ByteArrayPool(mPoolFactor, 2048)
 
     companion object {
         fun create(params: Params): AudioDevice {
