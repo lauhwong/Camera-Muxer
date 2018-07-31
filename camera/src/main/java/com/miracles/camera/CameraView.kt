@@ -6,7 +6,6 @@ import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
 import android.support.annotation.AttrRes
-import android.support.v4.os.ParcelableCompatCreatorCallbacks
 import android.support.v4.view.ViewCompat
 import android.util.AttributeSet
 import android.widget.FrameLayout
@@ -306,7 +305,11 @@ class CameraView : FrameLayout {
             out?.writeParcelable(recordPreviewSizeStrategy, 0)
         }
 
-        companion object CREATOR : ParcelableCompatCreatorCallbacks<SavedState> {
+        companion object CREATOR : Parcelable.ClassLoaderCreator<SavedState> {
+            override fun createFromParcel(source: Parcel?): SavedState {
+                return SavedState(source, CameraView.SavedState.CREATOR::class.java.classLoader)
+            }
+
             override fun createFromParcel(`in`: Parcel?, loader: ClassLoader?): SavedState {
                 return SavedState(`in`, loader)
             }

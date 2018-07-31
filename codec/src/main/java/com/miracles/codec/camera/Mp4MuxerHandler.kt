@@ -27,7 +27,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     @SuppressLint("UseSparseArrays")
     private val mAudioBytesCache = HashMap<Int, MutableList<AudioCache>>()
     private val mAudioInputLock = ReentrantLock(true)
-    private var mReleased = AtomicBoolean(false)
+    private var mReleased = AtomicBoolean(true)
     private var mDiscardFrame = false
     private val mDiscardFrameThreshold: Int
     private var mLastCheckFrameDiscardTime = 0L
@@ -88,7 +88,6 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     }
 
     override fun onStartRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
-        mReleased.set(false)
         //create mp4 muxer
         val size = cameraView.getSize(CameraFunctions.SIZE_RECORD)
         mMp4Muxer = createMp4Muxer(size.width, size.height)
@@ -107,6 +106,8 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         //start audio device
         mMp4Muxer.mAudioDevice.addCallback(this)
         mMp4Muxer.mAudioDevice.start()
+        //can be released now...
+        mReleased.set(false)
     }
 
     override fun onFrameRecording(cameraView: CameraView, frameBytes: CameraView.FrameBytes, width: Int, height: Int, format: Int,

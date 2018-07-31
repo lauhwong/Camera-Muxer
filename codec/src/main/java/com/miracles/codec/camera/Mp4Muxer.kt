@@ -89,11 +89,18 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
         audioCodec.configure(audioFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         val audioCodecLife = MediaCodecLife(audioCodec, true)
         //construct memuxer.
+        val nameOfMp4 = "M-${params.width}*${params.height}_${System.currentTimeMillis()}.mp4"
         var f = params.path
         if (f == null) {
-            f = File(ctx.cacheDir, "M_${params.width}_${params.height}.mp4").absolutePath
+            f = File(ctx.cacheDir, nameOfMp4).absolutePath
+        } else if (f.endsWith(File.separator)) {
+            f += nameOfMp4
         }
         mMp4Path = f!!
+        val file = File(mMp4Path)
+        if (file.parentFile != null) {
+            file.parentFile.mkdirs()
+        }
         val muxer = MediaMuxer(mMp4Path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
         mMuxer = MeMuxer(muxer, videoCodecLife, audioCodecLife)
     }
