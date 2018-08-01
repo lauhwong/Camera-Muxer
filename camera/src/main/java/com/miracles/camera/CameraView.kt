@@ -8,6 +8,7 @@ import android.os.Parcelable
 import android.support.annotation.AttrRes
 import android.support.v4.view.ViewCompat
 import android.util.AttributeSet
+import android.view.View
 import android.widget.FrameLayout
 import com.miracles.camera.CameraFunctions.Companion.SIZE_PREVIEW
 import com.miracles.camera.CameraFunctions.Companion.STRATEGY_PICTURE_SIZE
@@ -115,6 +116,10 @@ class CameraView : FrameLayout {
             mDisplayOrientationDetector.disable()
         }
         super.onDetachedFromWindow()
+    }
+
+    override fun onVisibilityChanged(changedView: View?, visibility: Int) {
+        super.onVisibilityChanged(changedView, visibility)
     }
 
     /**

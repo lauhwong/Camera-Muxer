@@ -19,7 +19,9 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     fun initialize(factor: Int) {
         if (factor <= 0) return
         for (x in 0..factor) {
-            releaseBytes(ByteArray(perSize))
+            if (!releaseBytes(ByteArray(perSize))) {
+                break
+            }
         }
     }
 

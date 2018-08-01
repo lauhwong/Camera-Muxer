@@ -38,7 +38,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     private val mPreviewSizes = arrayListOf<Size>()
     private val mPictureSizes = arrayListOf<Size>()
     private var mShowingPreview = false
-
+    private var mLastPreviewTimeStamp = 0L
 
     init {
         preview.callback = object : CameraPreview.PreviewCallback {
@@ -57,12 +57,14 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         }
         mCamera?.startPreview()
         mShowingPreview = true
+        if (isRecordingFrame()) {
+            resumeFrameRecording()
+        }
         return true
     }
 
     override fun close() {
         stopPreview()
-        mPreviewBytesPool.clear()
         releaseCamera()
     }
 
@@ -250,48 +252,49 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
 
     }
 
-    private var lastPreviewTimeStamp = 0L
     override fun startRecord() {
         if (mRecordingFrameInProgress.getAndSet(true)) return
         callback.onStartRecordingFrame(timeStampInNs())
-        mCamera?.run {
-            val previewSize = parameters.previewSize
-            val sizeInByte = previewSize.width * previewSize.height * 3 / 2
-            val maxFactor = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).bytesPoolSize(com.miracles.camera.Size(previewSize.width, previewSize.height))
-            if (mPreviewBytesPool.perSize != sizeInByte) {
-                mPreviewBytesPool.clear()
-                mPreviewBytesPool = ByteArrayPool(maxFactor, sizeInByte, maxFactor)
-            } else {
-                mPreviewBytesPool.initialize(maxFactor)
-            }
-            for (x in 0..2) {
-                addCallbackBuffer(mPreviewBytesPool.getBytes())
-            }
-            val format = parameters.previewFormat
-            setPreviewCallbackWithBuffer { data, _ ->
-                if (!mRecordingFrameInProgress.get() || data?.size ?: 0 == 0) {
-                    addCallbackBuffer(data)
-                    return@setPreviewCallbackWithBuffer
-                }
-                if (lastPreviewTimeStamp == 0L) {
-                    lastPreviewTimeStamp = timeStampInNs()
-                }
-                logMED("---->recoring frame gap=${(timeStampInNs() - lastPreviewTimeStamp) / 1e6.toInt()}")
-                lastPreviewTimeStamp = timeStampInNs()
-                callback.onFrameRecording(data, data.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
-                        calcCameraRotation(displayOrientation), facing, timeStampInNs())
-                addCallbackBuffer(mPreviewBytesPool.getBytes())
-            }
-        }
+        resumeFrameRecording()
+    }
 
+    private fun resumeFrameRecording() {
+        val cam = mCamera ?: return
+        val previewSize = cam.parameters.previewSize
+        val sizeInByte = previewSize.width * previewSize.height * 3 / 2
+        val maxFactor = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).bytesPoolSize(com.miracles.camera.Size(previewSize.width, previewSize.height))
+        if (mPreviewBytesPool.perSize != sizeInByte) {
+            mPreviewBytesPool.clear()
+            mPreviewBytesPool = ByteArrayPool(maxFactor, sizeInByte, maxFactor)
+        } else {
+            mPreviewBytesPool.initialize(maxFactor)
+        }
+        for (x in 0..2) {
+            cam.addCallbackBuffer(mPreviewBytesPool.getBytes())
+        }
+        val format = cam.parameters.previewFormat
+        cam.setPreviewCallbackWithBuffer { data, _ ->
+            if (!mRecordingFrameInProgress.get() || data?.size ?: 0 == 0) {
+                cam.addCallbackBuffer(data)
+                return@setPreviewCallbackWithBuffer
+            }
+            if (mLastPreviewTimeStamp == 0L) {
+                mLastPreviewTimeStamp = timeStampInNs()
+            }
+            logMED("---->recoring frame gap=${(timeStampInNs() - mLastPreviewTimeStamp) / 1e6.toInt()}")
+            mLastPreviewTimeStamp = timeStampInNs()
+            callback.onFrameRecording(data, data.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
+                    calcCameraRotation(displayOrientation), facing, timeStampInNs())
+            cam.addCallbackBuffer(mPreviewBytesPool.getBytes())
+        }
     }
 
     override fun stopRecord() {
         if (!mRecordingFrameInProgress.get()) return
         mCamera?.setPreviewCallbackWithBuffer(null)
         callback.onStopRecordingFrame(timeStampInNs())
-        mRecordingFrameInProgress.set(false)
         mPreviewBytesPool.clear()
+        mRecordingFrameInProgress.set(false)
     }
 
     override fun isCameraOpened() = mCamera != null
