@@ -3,6 +3,7 @@ package com.miracles.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.ImageFormat
+import android.graphics.Rect
 import android.hardware.camera2.*
 import android.hardware.camera2.params.StreamConfigurationMap
 import android.media.ImageReader
@@ -558,5 +559,18 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
 
     override fun updateDisplayOrientation(displayOrientation: Int) {
         preview.setDisplayOrientation(displayOrientation)
+    }
+
+    override fun getZoom(): Int {
+        //todo
+        return ZOOM_MIN
+    }
+
+    override fun setZoom(zoom: Int) {
+        //todo
+    }
+
+    override fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) {
+        //todo
     }
 }

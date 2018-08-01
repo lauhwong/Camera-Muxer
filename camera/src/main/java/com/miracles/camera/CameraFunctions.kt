@@ -1,5 +1,7 @@
 package com.miracles.camera
 
+import android.graphics.Rect
+
 /**
  * Created by lxw
  */
@@ -27,6 +29,9 @@ abstract class CameraFunctions {
         const val SIZE_PREVIEW = 0
         const val SIZE_PICTURE = 1
         const val SIZE_RECORD = 2
+
+        const val ZOOM_MIN = 1
+        const val ZOOM_MAX = 10
     }
 
     private val facings = arrayOf(FACING_FRONT, FACING_BACK)
@@ -91,6 +96,11 @@ abstract class CameraFunctions {
 
     abstract fun getCameraSizeStrategy(kind: Int): ChooseSizeStrategy
 
+    abstract fun setZoom(zoom: Int)
+
+    abstract fun getZoom(): Int
+
+    abstract fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?)
 
     interface Callback {
 

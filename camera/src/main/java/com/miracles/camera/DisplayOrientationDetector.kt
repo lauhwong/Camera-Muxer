@@ -61,7 +61,7 @@ abstract class DisplayOrientationDetector(ctx: Context) {
     /**
      * Called when display orientation is changed.
      *
-     * @param displayOrientation One of 0, 90, 180, and 270.
+     * @param displayOrientation(counterclockwise) One of 0, 90, 180, and 270.
      */
     abstract fun onDisplayOrientationChanged(displayOrientation: Int)
 }

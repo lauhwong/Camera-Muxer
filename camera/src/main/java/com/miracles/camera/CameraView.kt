@@ -2,6 +2,7 @@ package com.miracles.camera
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Rect
 import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
@@ -247,6 +248,24 @@ class CameraView : FrameLayout {
     fun removeCallback(cb: Callback) {
         mCallbacks.removeCallback(cb)
     }
+
+    /**
+     * Zoom camera's  preview and output.
+     *
+     * @see CameraFunctions.ZOOM_MIN
+     * @see CameraFunctions.ZOOM_MAX
+     */
+    fun setZoom(zoom: Int) {
+        mDeviceImpl.setZoom(zoom)
+    }
+
+    fun getZoom() = mDeviceImpl.getZoom()
+
+    /**
+     * try 2  focus with rect and callback
+     *
+     */
+    fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) = mDeviceImpl.focus(rect, cb)
 
     override fun onSaveInstanceState(): Parcelable {
         val state = SavedState(super.onSaveInstanceState())

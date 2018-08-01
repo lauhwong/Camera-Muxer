@@ -57,4 +57,6 @@ abstract class CameraDevice(val preview: CameraPreview, val callback: CameraFunc
     protected fun cacheCameraSize(kind: Int, size: Size) {
         mSizeMaps.put(kind, size)
     }
+
+    protected fun constraintZoom(zoom: Int, maxZoom: Int, maxConstraintZoom: Int) = (zoom.toFloat() / maxZoom * maxConstraintZoom).toInt()
 }

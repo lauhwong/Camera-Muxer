@@ -1,6 +1,9 @@
 package com.miracles.camera
 
 import android.annotation.SuppressLint
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.RectF
 import android.hardware.Camera
 import android.os.Build
 import android.support.v4.util.SparseArrayCompat
@@ -102,6 +105,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
 
     private fun setFlashInternal(flash: Int): Boolean {
         val parameters = mCameraParameters ?: return false
+        parameters.focusAreas
         if (isCameraOpened()) {
             val modes = parameters.supportedFlashModes
             val mode = FLASH_MODES.get(flash)
@@ -187,7 +191,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     private fun adjustCameraParameters() {
         val parameters = mCameraParameters ?: return
         val previewSize = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).chooseSize(preview, displayOrientation, mCameraInfo.orientation, facing, mPreviewSizes)
-        cacheCameraSize(SIZE_RECORD, previewSize)
+        cacheCameraSize(SIZE_PREVIEW, previewSize)
         cacheCameraSize(SIZE_RECORD, previewSize)
         val pictureSize = getCameraSizeStrategy(STRATEGY_PICTURE_SIZE).chooseSize(preview, displayOrientation, mCameraInfo.orientation, facing, mPictureSizes)
         cacheCameraSize(SIZE_PICTURE, pictureSize)
@@ -306,6 +310,72 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         callback.onCameraClosed()
     }
 
+    //Note:setZoom must be after setPreviewSize.
+    override fun setZoom(zoom: Int) {
+        val params = mCameraParameters ?: return
+        val supported = params.isZoomSupported
+        if (!supported) return
+        var z = zoom
+        if (z <= ZOOM_MIN) {
+            z = ZOOM_MIN
+        } else if (z >= ZOOM_MAX) {
+            z = ZOOM_MAX
+        }
+        params.zoom = constraintZoom(z, ZOOM_MAX, params.maxZoom)
+        mCamera?.parameters = mCameraParameters
+    }
+
+    override fun getZoom(): Int {
+        val params = mCamera?.parameters ?: return ZOOM_MIN
+        val supported = params.isZoomSupported
+        if (!supported) return ZOOM_MIN
+        return if (!supported) {
+            ZOOM_MIN
+        } else {
+            constraintZoom(params.zoom, params.maxZoom, ZOOM_MAX)
+        }
+    }
+
+    override fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) {
+        val cam = mCamera
+        val params = mCameraParameters
+        if (cam == null || params == null) {
+            cb?.invoke(false)
+            return
+        }
+        if (rect != null && rect.width() > 0 && rect.height() > 0) {
+            val maxAreas = params.maxNumFocusAreas
+            if (maxAreas > 0) {
+                val focusArea = getFocusArea(rect)
+                if (focusArea.width() > 0 && focusArea.height() > 0) {
+                    params.focusAreas = arrayListOf(Camera.Area(focusArea, 1000))
+                }
+            }
+        }
+        cam.cancelAutoFocus()
+        cam.autoFocus { success, _ ->
+            cb?.invoke(success)
+            cam.autoFocus(null)
+        }
+    }
+
+    private fun getFocusArea(rect: Rect): Rect {
+        val previewSize = getSize(SIZE_PREVIEW)
+        if (previewSize.height < 0 || previewSize.width < 0 || !preview.isReady()) {
+            return Rect()
+        }
+        val matrix = Matrix()
+        val prf = RectF(0f, 0f, preview.getWidth().toFloat(), preview.getHeight().toFloat())
+        val pzrf = RectF(0f, 0f, previewSize.height.toFloat(), previewSize.width.toFloat())
+        matrix.postRotate(-displayOrientation.toFloat())
+        matrix.setRectToRect(prf, pzrf, Matrix.ScaleToFit.FILL)
+        matrix.postRotate(-calcCameraRotation(0).toFloat())
+        matrix.setRectToRect(pzrf, RectF(-1000f, -1000f, 1000f, 1000f), Matrix.ScaleToFit.FILL)
+        val dst = RectF(rect.left.toFloat(), rect.top.toFloat(), rect.right.toFloat(), rect.bottom.toFloat())
+        matrix.mapRect(dst)
+        return Rect(dst.left.toInt(), dst.top.toInt(), dst.right.toInt(), dst.bottom.toInt())
+    }
+
     /**
      * Calculate camera display orientation
      */
@@ -318,7 +388,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     }
 
     /**
-     * Calculate camera rotation( pictures's orientation)
+     * Calculate camera rotation( pictures's orientation clockwise )
      */
     private fun calcCameraRotation(screenOrientationDegrees: Int): Int {
         return if (mCameraInfo.facing == Camera.CameraInfo.CAMERA_FACING_FRONT) {
