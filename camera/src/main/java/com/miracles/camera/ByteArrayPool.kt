@@ -1,16 +1,17 @@
 package com.miracles.camera
 
-import java.util.*
+import java.util.concurrent.LinkedBlockingDeque
+import java.util.concurrent.TimeUnit
 
 /**
  * Created by lxw
  */
 class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     companion object {
-        val EMPTY = ByteArrayPool(0, 1)
+        val EMPTY = ByteArrayPool(1, 1)
     }
 
-    private val mPool = ArrayDeque<ByteArray>(maxSize)
+    private val mPool = LinkedBlockingDeque<ByteArray>(maxSize)
 
     constructor(maxSize: Int, perSize: Int, factor: Int) : this(maxSize, perSize) {
         initialize(factor)
@@ -26,9 +27,16 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     }
 
     fun getBytes(): ByteArray {
+        return getBytes(0, TimeUnit.MILLISECONDS)
+    }
+
+    fun getBytes(timeout: Long, unit: TimeUnit): ByteArray {
         var result: ByteArray? = null
         synchronized(mPool) {
-            result = mPool.poll()
+            try {
+                result = mPool.poll(timeout, unit)
+            } catch (ignored: InterruptedException) {
+            }
         }
         return result ?: ByteArray(perSize)
     }

@@ -105,7 +105,6 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
 
     private fun setFlashInternal(flash: Int): Boolean {
         val parameters = mCameraParameters ?: return false
-        parameters.focusAreas
         if (isCameraOpened()) {
             val modes = parameters.supportedFlashModes
             val mode = FLASH_MODES.get(flash)

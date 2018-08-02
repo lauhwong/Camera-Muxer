@@ -2,7 +2,10 @@ package com.miracles.mediacodec
 
 import android.content.Context
 import android.content.Intent
-import android.os.*
+import android.os.Bundle
+import android.os.Environment
+import android.os.Parcel
+import android.os.Parcelable
 import com.miracles.camera.*
 import com.miracles.codec.camera.AudioDevice
 import com.miracles.codec.camera.CapturePictureHandler
@@ -41,8 +44,7 @@ class CameraActivity : BaseActivity() {
         //record preview size
         cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE, getRecordStrategy())
         //mp4Callback
-        val discardThreshold = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) 5 else 10
-        cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir(), discardThreshold) {
+        cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir()) {
             override fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
                 super.onStopRecordingFrame(cameraView, timeStampInNs)
                 PreviewActivity.start(this@CameraActivity, mMp4Path, false)
@@ -92,13 +94,6 @@ class CameraActivity : BaseActivity() {
             }
         }
 
-        override fun bytesPoolSize(size: Size): Int {
-            return when {
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> 8
-                Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> 12
-                else -> 15
-            }
-        }
 
         companion object CREATOR : Parcelable.Creator<MChooseStrategy> {
             override fun createFromParcel(parcel: Parcel): MChooseStrategy {
@@ -114,7 +109,7 @@ class CameraActivity : BaseActivity() {
     /**
      * Mp4 record handler .path
      */
-    private open class MMP4MuxerHandler(val ctx: Context, val dir: File, discardThreshold: Int) : Mp4MuxerHandler(discardThreshold) {
+    private open class MMP4MuxerHandler(val ctx: Context, val dir: File) : Mp4MuxerHandler() {
         override fun createMp4Muxer(frameWidth: Int, frameHeight: Int): Mp4Muxer {
             val path = File(dir, "me.mp4").absolutePath
             val mp4Param = Mp4Muxer.Params().apply {

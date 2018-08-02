@@ -90,18 +90,22 @@ class MeMuxer(val mediaMuxer: MediaMuxer, val videoCodecLife: MediaCodecLife, va
         }
     }
 
+    @Synchronized
     override fun start() {
         videoCodecLife.start()
         audioCodecLife.start()
     }
 
+    @Synchronized
     override fun stop() {
         videoCodecLife.stop()
         audioCodecLife.stop()
     }
 
+    @Synchronized
     override fun audioInput(bytes: ByteArray, len: Int, timeStampInNs: Long) = audioCodecLife.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
 
+    @Synchronized
     override fun videoInput(bytes: ByteArray, len: Int, timeStampInNs: Long) = videoCodecLife.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
 
 }
