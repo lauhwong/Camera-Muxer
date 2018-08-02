@@ -7,11 +7,11 @@ import java.util.concurrent.TimeUnit
 /**
  * Created by lxw
  */
-class CodeThreadPool(fixedSize: Int) {
+class FrameCodeThreadPool(fixedSize: Int) {
     private val mPool: ThreadPoolExecutor
     private val mQueue = LinkedBlockingQueue<Runnable>()
     private val mWaitLock = Object()
-    private val mExecutedTimestamps = HashMap<Long, Boolean>()
+    private val mExecutedTimestamps = LinkedHashMap<Long, Boolean>()
 
     init {
         mPool = object : ThreadPoolExecutor(fixedSize, fixedSize, 0L, TimeUnit.MILLISECONDS,
