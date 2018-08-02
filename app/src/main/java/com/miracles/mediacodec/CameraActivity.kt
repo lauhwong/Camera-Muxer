@@ -2,9 +2,7 @@ package com.miracles.mediacodec
 
 import android.content.Context
 import android.content.Intent
-import android.os.Build
-import android.os.Bundle
-import android.os.Environment
+import android.os.*
 import com.miracles.camera.*
 import com.miracles.codec.camera.AudioDevice
 import com.miracles.codec.camera.CapturePictureHandler
@@ -41,11 +39,10 @@ class CameraActivity : BaseActivity() {
         cameraControls.bindCameraView(cameraView)
         val picturePath = File(getSavedDir(), "me.jpeg").absolutePath
         //record preview size
-        cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE,
-                getRecordStrategy())
+        cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE, getRecordStrategy())
         //mp4Callback
-        val discardThreshold = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) 3 else 10
-        cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir(),discardThreshold) {
+        val discardThreshold = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) 5 else 10
+        cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir(), discardThreshold) {
             override fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
                 super.onStopRecordingFrame(cameraView, timeStampInNs)
                 PreviewActivity.start(this@CameraActivity, mMp4Path, false)
@@ -65,13 +62,51 @@ class CameraActivity : BaseActivity() {
         val display = resources.displayMetrics
         logMED("display width=${display.widthPixels} ,height=${display.heightPixels}")
         val aspectRatio = display.heightPixels.toFloat() / display.widthPixels
-        return object : ChooseSizeStrategy.AspectRatioStrategy(aspectRatio, (1080 * aspectRatio).toInt(), 1080) {
-            override fun bytesPoolSize(size: Size): Int {
-                return when {
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> 8
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> 12
-                    else -> 15
-                }
+        return MChooseStrategy(16/9f)
+    }
+
+    private class MChooseStrategy(val aspectRatio: Float) : ChooseSizeStrategy {
+        private val mFacingBackChooseStrategy: ChooseSizeStrategy
+        private val mFacingFrontChooseStrategy: ChooseSizeStrategy
+
+        init {
+            mFacingFrontChooseStrategy = ChooseSizeStrategy.AspectRatioStrategy(aspectRatio, (480 * aspectRatio).toInt(), 480)
+            mFacingBackChooseStrategy = ChooseSizeStrategy.AspectRatioStrategy(aspectRatio, (1080 * aspectRatio).toInt(), 1080)
+        }
+
+        constructor(parcel: Parcel) : this(parcel.readFloat()) {
+
+        }
+
+        override fun writeToParcel(dest: Parcel?, flags: Int) {
+            dest?.writeFloat(aspectRatio)
+        }
+
+        override fun describeContents() = 0
+
+        override fun chooseSize(preview: CameraPreview, displayOrientation: Int, cameraSensorOrientation: Int, facing: Int, sizes: List<Size>): Size {
+            return if (facing == CameraFunctions.FACING_FRONT) {
+                mFacingFrontChooseStrategy.chooseSize(preview, displayOrientation, cameraSensorOrientation, facing, sizes)
+            } else {
+                mFacingBackChooseStrategy.chooseSize(preview, displayOrientation, cameraSensorOrientation, facing, sizes)
+            }
+        }
+
+        override fun bytesPoolSize(size: Size): Int {
+            return when {
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.M -> 8
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP -> 12
+                else -> 15
+            }
+        }
+
+        companion object CREATOR : Parcelable.Creator<MChooseStrategy> {
+            override fun createFromParcel(parcel: Parcel): MChooseStrategy {
+                return MChooseStrategy(parcel)
+            }
+
+            override fun newArray(size: Int): Array<MChooseStrategy?> {
+                return arrayOfNulls(size)
             }
         }
     }

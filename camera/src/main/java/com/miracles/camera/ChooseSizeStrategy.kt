@@ -3,7 +3,6 @@ package com.miracles.camera
 import android.os.Parcel
 import android.os.Parcelable
 import android.view.Surface
-import kotlin.math.sign
 
 /**
  * Created by lxw
@@ -63,10 +62,10 @@ interface ChooseSizeStrategy : Parcelable {
 
         override fun chooseSize(preview: CameraPreview, displayOrientation: Int, cameraSensorOrientation: Int, facing: Int, sizes: List<Size>): Size {
             if (!preview.isReady()) return sizes.first()
-            val sorted = sizes.sortedWith(Comparator { o1, o2 ->
-                (Math.abs(aspectRatio - o1.width.toFloat() / o1.height)
-                        - Math.abs(aspectRatio - o2.width.toFloat() / o2.height)).sign.toInt()
-            })
+//            val sorted = sizes.sortedWith(Comparator { o1, o2 ->
+//                (Math.abs(aspectRatio - o1.width.toFloat() / o1.height)
+//                        - Math.abs(aspectRatio - o2.width.toFloat() / o2.height)).sign.toInt()
+//            })
             var swappedDimensions = false
             when (displayOrientation) {
                 Surface.ROTATION_0, Surface.ROTATION_180 -> if (cameraSensorOrientation == 90 || cameraSensorOrientation == 270) {
@@ -88,7 +87,7 @@ interface ChooseSizeStrategy : Parcelable {
             }
             var lastDelta = Int.MAX_VALUE
             var lastIndex = 0
-            for ((index, size) in sorted.withIndex()) {
+            for ((index, size) in sizes.withIndex()) {
                 if (size.width > maxSizeWidth || size.height > maxSizeHeight) continue
                 val delta = Math.abs(size.width - desiredWidth) + Math.abs(size.height - desiredHeight)
                 if (delta <= lastDelta) {
@@ -96,7 +95,7 @@ interface ChooseSizeStrategy : Parcelable {
                     lastIndex = index
                 }
             }
-            return sorted[lastIndex]
+            return sizes[lastIndex]
         }
 
         override fun writeToParcel(parcel: Parcel, flags: Int) {

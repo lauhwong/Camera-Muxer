@@ -212,6 +212,13 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         }
     }
 
+    override fun setCameraSizeStrategy(kind: Int, strategy: ChooseSizeStrategy) {
+        if (kind == STRATEGY_RECORD_PREVIEW_SIZE) {
+            super.setCameraSizeStrategy(STRATEGY_PREVIEW_SIZE, strategy)
+        }
+        super.setCameraSizeStrategy(kind, strategy)
+    }
+
     @SuppressLint("ObsoleteSdkInt")
     override fun updateDisplayOrientation(displayOrientation: Int) {
         val camera = mCamera ?: return
