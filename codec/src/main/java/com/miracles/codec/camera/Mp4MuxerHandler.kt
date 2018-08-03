@@ -28,7 +28,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     private val mAudioBytesCache = HashMap<Int, MutableList<AudioCache>>()
     private val mAudioInputLock = ReentrantLock(true)
     private var mReleased = AtomicBoolean(true)
-    private var mCodeThreadPool: CodeThreadPool? = null
+    private var mCodeThreadPool: FrameCodeThreadPool? = null
     val codePoolSize: Int
     private val mVideoLock = Object()
 
@@ -87,7 +87,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
 
     override fun onStartRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
         //create threadPool
-        mCodeThreadPool = CodeThreadPool(codePoolSize)
+        mCodeThreadPool = FrameCodeThreadPool(codePoolSize)
         //create mp4 muxer
         val size = cameraView.getSize(CameraFunctions.SIZE_RECORD)
         mMp4Muxer = createMp4Muxer(size.width, size.height)
@@ -115,8 +115,10 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
 
     override fun onFrameRecording(cameraView: CameraView, frameBytes: CameraView.FrameBytes, width: Int, height: Int, format: Int,
                                   orientation: Int, facing: Int, timeStampInNs: Long) {
-        val pool = mCodeThreadPool ?: throw IllegalArgumentException("RecordThreadPool is not initialized! ")
-        pool.execute(object : CodeThreadPool.TimestampRunnable(timeStampInNs) {
+        val pool = mCodeThreadPool
+                ?: throw IllegalArgumentException("RecordThreadPool is not initialized! ")
+        frameBytes.consumed = true
+        pool.execute(object : FrameCodeThreadPool.TimestampRunnable(timeStampInNs) {
             override fun run() {
                 val start = System.nanoTime()
                 val fps = mMp4Muxer.params.fps
@@ -132,21 +134,16 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                 val compressed = compress(data, data.size, orientation, facing, width, height, codeFormat, mMp4Muxer.mSupportDeprecated420)
                 //2.release bytes.
                 frameBytes.bytesPool.releaseBytes(data)
-                frameBytes.released = true
                 //3.wait for last frame to complete.
                 pool.runCondition { pool.hasSmallerTimestampRunning(timeStamp) }
                 //4.code compressed data to Mp4.
-                var consumeAudioInput = false
-                var timeInSN = 0
-                synchronized(mVideoLock) {
-                    //timeStampInNs - mStartTimeStamp
-                    ++mRecordFrame
-                    mRecordingTimeStamp += fpsGapInNs
-                    mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
-                    mCompressedFrameBytesPool.releaseBytes(compressed)
-                    consumeAudioInput = mRecordFrame % fps == 0
-                    timeInSN = mRecordFrame / fps
-                }
+                ++mRecordFrame
+                //mRecordingTimeStamp += fpsGapInNs
+                mRecordingTimeStamp = timeStampInNs - mStartTimeStamp
+                mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
+                mCompressedFrameBytesPool.releaseBytes(compressed)
+                val consumeAudioInput = mRecordFrame % fps == 0
+                val timeInSN = (mRecordingTimeStamp / 1e9).toInt()
                 if (consumeAudioInput) {
                     consumeAudioInput(timeInSN, Long.MAX_VALUE, false)
                 }

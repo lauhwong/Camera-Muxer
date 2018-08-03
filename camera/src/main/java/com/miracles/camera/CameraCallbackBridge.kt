@@ -39,7 +39,7 @@ internal class CameraCallbackBridge(val cameraView: CameraView) : CallbackBridge
         val frameBytes = CameraView.FrameBytes(data, len, bytesPool, false)
         callback { onFrameRecording(cameraView, frameBytes, width, height, format, orientation, facing, timeStampInNs) }
         //recycle bytes to reuse...
-        mBackgroundThread.enqueue(Runnable { if (!frameBytes.released) bytesPool.releaseBytes(data) })
+        mBackgroundThread.enqueue(Runnable { if (!frameBytes.consumed) bytesPool.releaseBytes(data) })
     }
 
     override fun onStopRecordingFrame(timeStampInNs: Long) {

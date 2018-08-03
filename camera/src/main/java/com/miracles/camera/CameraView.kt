@@ -369,7 +369,7 @@ class CameraView : FrameLayout {
         fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {}
     }
 
-    data class FrameBytes(val datas: ByteArray, val len: Int, val bytesPool: ByteArrayPool, var released: Boolean) {
+    data class FrameBytes(val datas: ByteArray, val len: Int, val bytesPool: ByteArrayPool, var consumed: Boolean) {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
             if (other !is FrameBytes) return false
@@ -377,7 +377,7 @@ class CameraView : FrameLayout {
             if (!Arrays.equals(datas, other.datas)) return false
             if (len != other.len) return false
             if (bytesPool != other.bytesPool) return false
-            if (released != other.released) return false
+            if (consumed != other.consumed) return false
 
             return true
         }
@@ -386,7 +386,7 @@ class CameraView : FrameLayout {
             var result = Arrays.hashCode(datas)
             result = 31 * result + len
             result = 31 * result + bytesPool.hashCode()
-            result = 31 * result + released.hashCode()
+            result = 31 * result + consumed.hashCode()
             return result
         }
     }
