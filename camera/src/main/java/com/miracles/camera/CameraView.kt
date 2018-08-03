@@ -261,11 +261,13 @@ class CameraView : FrameLayout {
 
     fun getZoom() = mDeviceImpl.getZoom()
 
+    fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) = mDeviceImpl.focus(rect, null, cb)
     /**
-     * try 2  focus with rect and callback
+     * Note:it will set autoFocus to false.
      *
+     * try 2  focus with focusRect&meteringRect and callback
      */
-    fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) = mDeviceImpl.focus(rect, cb)
+    fun focus(focusRect: Rect?, meteringRect: Rect?, cb: ((Boolean) -> Unit)?) = mDeviceImpl.focus(focusRect, meteringRect, cb)
 
     override fun onSaveInstanceState(): Parcelable {
         val state = SavedState(super.onSaveInstanceState())

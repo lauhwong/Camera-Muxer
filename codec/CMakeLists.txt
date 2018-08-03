@@ -3,10 +3,8 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-add_library(yuv-utils SHARED src/main/cpp/yuvutils.cpp )
-
 file(GLOB_RECURSE ly_source_files src/libyuv/source/*.cc)
-add_library(libyuv SHARED ${ly_source_files})
-include_directories(src/libyuv/include)
 
-target_link_libraries(yuv-utils libyuv)
+include_directories(src/libyuv/include src/main/cpp/include)
+
+add_library(yuv-utils SHARED ${ly_source_files} src/main/cpp/yuvutils.cpp)

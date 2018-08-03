@@ -570,7 +570,7 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
         //todo
     }
 
-    override fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) {
+    override fun focus(focusRect: Rect?, meteringRect: Rect?, cb: ((Boolean) -> Unit)?) {
         //todo
     }
 }

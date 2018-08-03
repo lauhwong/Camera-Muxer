@@ -80,7 +80,6 @@ public class LibYuvUtils {
     public static int SCALE_FILTER_BOX = 3;
 
     static {
-        System.loadLibrary("libyuv");
         System.loadLibrary("yuv-utils");
     }
 

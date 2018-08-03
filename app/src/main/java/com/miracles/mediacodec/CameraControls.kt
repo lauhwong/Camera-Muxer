@@ -46,8 +46,25 @@ class CameraControls : FrameLayout {
                 } else {
                     cameraView.setFacing(CameraFunctions.FACING_BACK)
                 }
+
             }
+
+//            override fun onClicked(view: View) {
+//                val cameraView = mCameraView ?: return
+//                val zoom = cameraView.getZoom()
+//                cameraView.setZoom(zoom+1)
+//            }
         })
+//        setOnTouchListener { v, event ->
+//            val cameraView = mCameraView ?: return@setOnTouchListener false
+//            if (event.action == MotionEvent.ACTION_DOWN) {
+//                cameraView.focus(Rect((event.x - 100).toInt(), (event.y - 100).toInt(),
+//                        (event.x + 100).toInt(), (event.y + 100).toInt()), {
+//                    Toast.makeText(cameraView.context, "ManuallyFocused!", Toast.LENGTH_SHORT).show()
+//                })
+//            }
+//            return@setOnTouchListener false
+//        }
     }
 
     private open class DoubleTap() : OnClickListener {
@@ -84,7 +101,7 @@ class CameraControls : FrameLayout {
                     if (mPendingVideoCapture) {
                         mCapturingVideo = true
                         mCameraView?.startRecord()
-                        Toast.makeText(context,"正在录制...",Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "正在录制...", Toast.LENGTH_SHORT).show()
                     }
                 }, 250)
             }

@@ -82,15 +82,21 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         val parameter = mCameraParameters ?: return false
         return if (isCameraOpened()) {
             val modes = parameter.supportedFocusModes
-            if (autoFocus && modes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE)) {
-                parameter.focusMode = Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
-            } else if (modes.contains(Camera.Parameters.FOCUS_MODE_FIXED)) {
-                parameter.focusMode = Camera.Parameters.FOCUS_MODE_FIXED
-            } else if (modes.contains(Camera.Parameters.FOCUS_MODE_INFINITY)) {
-                parameter.focusMode = Camera.Parameters.FOCUS_MODE_INFINITY
+            val focusMode = if (autoFocus) {
+                when {
+                    modes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE) -> Camera.Parameters.FOCUS_MODE_CONTINUOUS_PICTURE
+                    modes.contains(Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO) -> Camera.Parameters.FOCUS_MODE_CONTINUOUS_VIDEO
+                    modes.contains(Camera.Parameters.FOCUS_MODE_INFINITY) -> Camera.Parameters.FOCUS_MODE_INFINITY
+                    else -> modes[0]
+                }
             } else {
-                parameter.focusMode = modes[0]
+                when {
+                    modes.contains(Camera.Parameters.FOCUS_MODE_AUTO) -> Camera.Parameters.FOCUS_MODE_AUTO
+                    modes.contains(Camera.Parameters.FOCUS_MODE_MACRO) -> Camera.Parameters.FOCUS_MODE_MACRO
+                    else -> modes[0]
+                }
             }
+            parameter.focusMode = focusMode
             true
         } else {
             false
@@ -265,6 +271,9 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     override fun startRecord() {
         if (mRecordingFrameInProgress.getAndSet(true)) return
         callback.onStartRecordingFrame(timeStampInNs())
+        if (!getAutoFocus()) {
+            setAutoFocus(true)
+        }
         resumeFrameRecording()
     }
 
@@ -313,6 +322,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         val cam = mCamera ?: return
         cam.release()
         mCamera = null
+        mCameraParameters = null
         callback.onCameraClosed()
     }
 
@@ -342,26 +352,37 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         }
     }
 
-    override fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?) {
+    override fun focus(focusRect: Rect?, meteringRect: Rect?, cb: ((Boolean) -> Unit)?) {
         val cam = mCamera
         val params = mCameraParameters
         if (cam == null || params == null) {
             cb?.invoke(false)
             return
         }
-        if (rect != null && rect.width() > 0 && rect.height() > 0) {
-            val maxAreas = params.maxNumFocusAreas
-            if (maxAreas > 0) {
-                val focusArea = getFocusArea(rect)
+        if (focusRect != null && focusRect.width() > 0 && focusRect.height() > 0) {
+            if (params.maxNumFocusAreas > 0) {
+                val focusArea = getFocusArea(focusRect)
                 if (focusArea.width() > 0 && focusArea.height() > 0) {
                     params.focusAreas = arrayListOf(Camera.Area(focusArea, 1000))
                 }
             }
         }
+        if (meteringRect != null && meteringRect.width() > 0 && meteringRect.height() > 0) {
+            if (params.maxNumMeteringAreas > 0) {
+                val meteringArea = getFocusArea(meteringRect)
+                if (meteringArea.width() > 0 && meteringArea.height() > 0) {
+                    params.meteringAreas = arrayListOf(Camera.Area(meteringArea, 1000))
+                }
+            }
+        }
         cam.cancelAutoFocus()
+        if (getAutoFocus()) {
+            setAutoFocus(false)
+        }
+        cam.parameters = params
         cam.autoFocus { success, _ ->
             cb?.invoke(success)
-            cam.autoFocus(null)
+            cam.cancelAutoFocus()
         }
     }
 
@@ -372,14 +393,27 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         }
         val matrix = Matrix()
         val prf = RectF(0f, 0f, preview.getWidth().toFloat(), preview.getHeight().toFloat())
-        val pzrf = RectF(0f, 0f, previewSize.height.toFloat(), previewSize.width.toFloat())
+        val sensorOrientation = calcCameraRotation(0)
+        val swap = sensorOrientation == 90 || sensorOrientation == 270
+        val pzrf = RectF(0f, 0f, if (swap) previewSize.height.toFloat() else previewSize.width.toFloat(),
+                if (swap) previewSize.width.toFloat() else previewSize.height.toFloat())
         matrix.postRotate(-displayOrientation.toFloat())
         matrix.setRectToRect(prf, pzrf, Matrix.ScaleToFit.FILL)
-        matrix.postRotate(-calcCameraRotation(0).toFloat())
-        matrix.setRectToRect(pzrf, RectF(-1000f, -1000f, 1000f, 1000f), Matrix.ScaleToFit.FILL)
+        matrix.postRotate(-sensorOrientation.toFloat())
+        val maxCameraAreaRectF = RectF(-1000f, -1000f, 1000f, 1000f)
+        matrix.setRectToRect(pzrf, maxCameraAreaRectF, Matrix.ScaleToFit.FILL)
         val dst = RectF(rect.left.toFloat(), rect.top.toFloat(), rect.right.toFloat(), rect.bottom.toFloat())
         matrix.mapRect(dst)
-        return Rect(dst.left.toInt(), dst.top.toInt(), dst.right.toInt(), dst.bottom.toInt())
+        val clampLeft = maxCameraAreaRectF.left.toInt()
+        val clampBottom = maxCameraAreaRectF.bottom.toInt()
+        val clampFun = clamp(clampLeft, clampBottom)
+        return Rect(clampFun(dst.left.toInt()), clampFun(dst.top.toInt()), clampFun(dst.right.toInt()), clampFun(dst.bottom.toInt()))
+    }
+
+    private fun clamp(min: Int, max: Int): (Int) -> Int {
+        return fun(value: Int): Int {
+            return if (value < min) min else if (value > max) max else value
+        }
     }
 
     /**

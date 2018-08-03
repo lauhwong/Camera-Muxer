@@ -100,7 +100,7 @@ abstract class CameraFunctions {
 
     abstract fun getZoom(): Int
 
-    abstract fun focus(rect: Rect?, cb: ((Boolean) -> Unit)?)
+    abstract fun focus(focusRect: Rect?, meteringRect: Rect?, cb: ((Boolean) -> Unit)?)
 
     interface Callback {
 
