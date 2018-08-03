@@ -40,6 +40,8 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
             }
         var videoBitrate = 1300000
         var fps = 30
+        // force 2 set mp4's fps=$fps
+        var fpsEnsure = false
         //audio code info
         var audioSampleRate = 44100
         var audioBitRate = 64000
