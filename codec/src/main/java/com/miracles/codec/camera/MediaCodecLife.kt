@@ -26,7 +26,7 @@ class MediaCodecLife(private val codec: MediaCodec, private val audio: Boolean) 
         val inputBuffer = codec.inputBuffers[index]
         inputBuffer.clear()
         if (inputBuffer.capacity() < len) {
-            codec.queueInputBuffer(index, 0, len, timeStamp, 0)
+            codec.queueInputBuffer(index, 0, 0, timeStamp, 0)
             return -1
         }
         inputBuffer.put(data, 0, len)

@@ -63,15 +63,19 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
         val videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, mMp4Width, mMp4Height)
         val videoCodec = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE)
         val capabilitiesForType = videoCodec.codecInfo.getCapabilitiesForType(VIDEO_MIME_TYPE)
+        var supportSemi420 = false
         for (key in capabilitiesForType.colorFormats) {
             if (key == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar) {
                 mSupportDeprecated420 = true
-                break
+            } else if (key == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) {
+                supportSemi420 = true
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
         } else {
+            //part of hw device is not support Deprecated420 (wtf...)
+            if (supportSemi420) mSupportDeprecated420 = false
             if (mSupportDeprecated420) {
                 videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar)
             } else {
