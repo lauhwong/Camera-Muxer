@@ -42,7 +42,6 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     private val mPreviewSizes = arrayListOf<Size>()
     private val mPictureSizes = arrayListOf<Size>()
     private var mShowingPreview = false
-    private var mLastPreviewTimeStamp = 0L
 
     init {
         preview.callback = object : CameraPreview.PreviewCallback {
@@ -209,7 +208,6 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         parameters.setPictureSize(pictureSize.width, pictureSize.height)
         logMED("pictureSize is $pictureSize")
         parameters.setRotation(calcCameraRotation(displayOrientation))
-        parameters.setRecordingHint(true)
         setAutoFocusInternal(mAutoFocus)
         setFlashInternal(mFlash)
         mCamera?.parameters = parameters
@@ -298,14 +296,11 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
                 cam.addCallbackBuffer(data)
                 return@setPreviewCallbackWithBuffer
             }
-            if (mLastPreviewTimeStamp == 0L) {
-                mLastPreviewTimeStamp = timeStampInNs()
-            }
-            logMED("---->recoring frame gap=${(timeStampInNs() - mLastPreviewTimeStamp) / 1e6.toInt()}")
-            mLastPreviewTimeStamp = timeStampInNs()
-            callback.onFrameRecording(data, data.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
+            val copied = mPreviewBytesPool.getBytes((1e9 / 40).toLong(), TimeUnit.NANOSECONDS)
+            System.arraycopy(data, 0, copied, 0, data.size)
+            callback.onFrameRecording(copied, copied.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
                     calcCameraRotation(displayOrientation), facing, timeStampInNs())
-            cam.addCallbackBuffer(mPreviewBytesPool.getBytes())
+            cam.addCallbackBuffer(data)
         }
     }
 

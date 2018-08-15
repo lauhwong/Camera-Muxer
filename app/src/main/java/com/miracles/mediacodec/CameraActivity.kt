@@ -55,7 +55,7 @@ class CameraActivity : BaseActivity() {
             override fun onPictureTaken(cameraView: CameraView, data: ByteArray) {
                 super.onPictureTaken(cameraView, data)
                 logMED("onPictureTaken")
-                PreviewActivity.start(this@CameraActivity, path, true)
+                PreviewActivity.start(this@CameraActivity, capturedPath!!, true)
             }
         })
     }

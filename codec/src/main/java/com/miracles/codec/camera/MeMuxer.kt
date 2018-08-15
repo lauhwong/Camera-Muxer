@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 /**
  * Created by lxw
  */
-class MeMuxer(val mediaMuxer: MediaMuxer, val videoCodecLife: MediaCodecLife, val audioCodecLife: MediaCodecLife) : LifeCycle, MeCodec {
+class MeMuxer(val balanceVideoTimestamp: Boolean, val mediaMuxer: MediaMuxer, val videoCodecLife: MediaCodecLife, val audioCodecLife: MediaCodecLife) : LifeCycle, MeCodec {
     private class CodecCallbackImpl(private val meMuxer: MeMuxer, private val audio: Boolean) : MediaCodecLife.CodecCallback {
         override fun onOutputStatus(codec: MediaCodec, status: Int) {
             super.onOutputStatus(codec, status)
@@ -62,8 +62,36 @@ class MeMuxer(val mediaMuxer: MediaMuxer, val videoCodecLife: MediaCodecLife, va
     private fun onOutputData(audio: Boolean, data: ByteArray, len: Int, timeStamp: Long, flags: Int) {
         val buf = MediaCodec.BufferInfo()
         buf.set(0, len, timeStamp, flags)
-        mBuffers.add(MediaBuf(audio, ByteBuffer.wrap(data), buf))
-        drainMediaBuf()
+        if (!audio && balanceVideoTimestamp) {
+            if (mBuffers.isNotEmpty()) {
+                fun timeInSeconds(buf: MediaBuf) = (buf.bufferInfo.presentationTimeUs / 1e6).toInt()
+                val balancedSecond = timeInSeconds(mBuffers.last())
+                val tsGap = (timeStamp / 1e6).toInt() - balancedSecond
+                if (tsGap >= 1) {
+                    var frames = 0
+                    for (index in mBuffers.size - 1 downTo 0) {
+                        if (timeInSeconds(mBuffers[index]) != balancedSecond) {
+                            break
+                        }
+                        ++frames
+                    }
+                    if (frames > 2) {
+                        val startTimeStamp = mBuffers[mBuffers.size - frames].bufferInfo.presentationTimeUs
+                        val endTimeStamp = mBuffers[mBuffers.size - 1].bufferInfo.presentationTimeUs
+                        val frameDeltaGap = (endTimeStamp - startTimeStamp) / frames - 1
+                        var count = 0
+                        for (index in mBuffers.size - frames until mBuffers.size) {
+                            mBuffers[index].bufferInfo.presentationTimeUs = startTimeStamp + (count++) * frameDeltaGap
+                        }
+                    }
+                    drainMediaBuf()
+                }
+            }
+            mBuffers.add(MediaBuf(audio, ByteBuffer.wrap(data), buf))
+        } else {
+            mBuffers.add(MediaBuf(audio, ByteBuffer.wrap(data), buf))
+            drainMediaBuf()
+        }
     }
 
     private fun drainMediaBuf() {
