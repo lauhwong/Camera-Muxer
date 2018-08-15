@@ -208,6 +208,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         parameters.setPictureSize(pictureSize.width, pictureSize.height)
         logMED("pictureSize is $pictureSize")
         parameters.setRotation(calcCameraRotation(displayOrientation))
+        parameters.setRecordingHint(true)
         setAutoFocusInternal(mAutoFocus)
         setFlashInternal(mFlash)
         mCamera?.parameters = parameters

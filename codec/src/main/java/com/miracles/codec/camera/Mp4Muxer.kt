@@ -42,8 +42,9 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
         var fps = 30
         // force 2 set mp4's fps=$fps
         var fpsEnsure = false
-        //balance video'timeStamp every second
-        var balanceVideoTimestamp = true
+        //balance video'timeStamp per gap
+        var balanceTimestamp = true
+        var balanceTimestampGapInSeconds = 3
         //audio code info
         var audioSampleRate = 44100
         var audioBitRate = 64000
@@ -110,6 +111,6 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
             file.parentFile.mkdirs()
         }
         val muxer = MediaMuxer(mMp4Path, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-        mMuxer = MeMuxer(params.balanceVideoTimestamp, muxer, videoCodecLife, audioCodecLife)
+        mMuxer = MeMuxer(params.balanceTimestamp, params.balanceTimestampGapInSeconds, muxer, videoCodecLife, audioCodecLife)
     }
 }
