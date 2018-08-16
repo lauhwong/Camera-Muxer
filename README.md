@@ -22,7 +22,7 @@ configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 dependencies {
-    implementation 'com.github.lauhwong:cameraview-muxer:0.7-SNAPSHOT'
+    implementation 'com.github.lauhwong:cameraview-muxer:0.8-SNAPSHOT'
 }
 ```
 2.开启或者关闭CameraView预览.

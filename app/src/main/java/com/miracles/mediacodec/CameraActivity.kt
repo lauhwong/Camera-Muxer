@@ -116,6 +116,7 @@ class CameraActivity : BaseActivity() {
                 this.path = path
                 this.width = frameHeight / 2
                 this.height = frameWidth / 2
+                this.balanceTimestampGapInSeconds=5
             }
             val audioParam = AudioDevice.Params()
             val audioDevice = AudioDevice.create(audioParam)

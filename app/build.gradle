@@ -36,9 +36,9 @@ configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 project.android.applicationVariants.all { variant ->
-    def parentFile = file('../demo')
+    def parentFile = file('. ./demo')
     def apkName = 'CameraMuxer'
-    def pattern = Pattern.compile("assemble(\\w*)(Release|Debug)")
+    def pattern = Pattern.compile("assemble(\\w*)Release")
     tasks.all {
         if (it.name.startsWith("assemble") && pattern.matcher(it.name).find()) {
             it.doLast {
