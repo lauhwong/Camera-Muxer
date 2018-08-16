@@ -64,26 +64,13 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     }
 
     override fun audioRecording(data: ByteArray, len: Int, timeStampInNs: Long) {
-        val startUpTimestamp = mStartTimestamp.get()
-        if (startUpTimestamp <= 0) return
-        val timeStamp = timeStampInNs - startUpTimestamp
-        val timeInSN = (timeStamp / 1e9).toInt()
-        //reduce blocking
-        if (timeInSN <= 1) {
+        try {
+            val startUpTimestamp = mStartTimestamp.get()
+            if (startUpTimestamp <= 0) return
+            val timeStamp = timeStampInNs - startUpTimestamp
             mMuxer.audioInput(data, len, timeStamp)
+        } finally {
             mMp4Muxer.mAudioDevice.release(data)
-        } else {
-            try {
-                mAudioInputLock.lock()
-                var list = mAudioBytesCache[timeInSN]
-                if (list == null) {
-                    list = arrayListOf()
-                    mAudioBytesCache[timeInSN] = list
-                }
-                list.add(AudioCache(data, len, timeStamp))
-            } finally {
-                mAudioInputLock.unlock()
-            }
         }
 
     }
@@ -109,8 +96,9 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMp4Muxer.mAudioDevice.start()
         //bytes pool of  compressed
         if (mCompressedFrameBytesPool == ByteArrayPool.EMPTY) {
+            val f = if (mMp4Muxer.mSupportDeprecated420) 1 else 2
             val mp4Size = mMp4Width * mMp4Height * 3 / 2
-            mCompressedFrameBytesPool = ByteArrayPool(2, mp4Size)
+            mCompressedFrameBytesPool = ByteArrayPool(f * codePoolSize, mp4Size)
         }
         //can be released now...
         mReleased.set(false)
@@ -152,33 +140,10 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                 }
                 mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
                 mCompressedFrameBytesPool.releaseBytes(compressed)
-                val consumeAudioInput = mRecordFrame % fps == 0
-                val timeInSN = (mRecordingTimeStamp / 1e9).toInt()
-                if (consumeAudioInput) {
-                    consumeAudioInput(timeInSN, Long.MAX_VALUE, false)
-                }
                 val consumedInNs = System.nanoTime() - start
                 logMED("onFrameRecording cost ${TimeUnit.NANOSECONDS.toMillis(consumedInNs)} ms!")
             }
         })
-    }
-
-    private fun consumeAudioInput(timeInSN: Int, maxTimeInNs: Long, endOfInput: Boolean) {
-        try {
-            mAudioInputLock.lock()
-            for (t in 0..timeInSN) {
-                val cachedAudios = mAudioBytesCache.remove(t) ?: continue
-                for ((bytes, len, timeInNs) in cachedAudios) {
-                    if (timeInNs <= maxTimeInNs) {
-                        mMuxer.audioInput(bytes, len, timeInNs)
-                    }
-                    mMp4Muxer.mAudioDevice.release(bytes)
-                }
-            }
-        } finally {
-            mAudioInputLock.unlock()
-        }
-        if (endOfInput) mAudioBytesCache.clear()
     }
 
     private fun compress(data: ByteArray, len: Int, orientation: Int, facing: Int,
@@ -205,8 +170,6 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         //stop threadPool
         mCodeThreadPool?.awaitTerminate()
         mCodeThreadPool = null
-        //stop muxer
-        consumeAudioInput((mRecordingTimeStamp / 1e9).toInt() + 1, mRecordingTimeStamp, true)
         mMuxer.stop()
         //clear cache.
         mCompressedFrameBytesPool.clear()

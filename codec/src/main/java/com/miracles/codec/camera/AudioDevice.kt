@@ -16,7 +16,7 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
     private val mStopped = AtomicBoolean(false)
     private var mAudioRecord: AudioRecord
     private var mRecordThread: Thread? = null
-    private val mPoolFactor = 100
+    private val mPoolFactor = 2
     //Note:do not initialized for bufSize...cause bug below 21....
     private val mByteArrayPool: ByteArrayPool = ByteArrayPool(mPoolFactor, 2048)
 

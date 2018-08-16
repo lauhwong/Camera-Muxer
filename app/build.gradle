@@ -1,5 +1,3 @@
-import java.util.regex.Pattern
-
 apply plugin: 'com.android.application'
 apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
@@ -36,11 +34,11 @@ configurations.all {
     resolutionStrategy.cacheChangingModulesFor 0, 'seconds'
 }
 project.android.applicationVariants.all { variant ->
-    def parentFile = file('. ./demo')
+    def parentFile = file('../demo')
     def apkName = 'CameraMuxer'
-    def pattern = Pattern.compile("assemble(\\w*)Release")
+    def taskName = variant.name
     tasks.all {
-        if (it.name.startsWith("assemble") && pattern.matcher(it.name).find()) {
+        if ("assemble${taskName.capitalize()}".equalsIgnoreCase(it.name))  {
             it.doLast {
                 copy {
                     from variant.outputs[0].outputFile
