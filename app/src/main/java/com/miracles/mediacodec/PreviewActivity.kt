@@ -5,6 +5,8 @@ import android.content.Intent
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import kotlinx.android.synthetic.main.activity_preview.*
 import java.io.File
@@ -53,7 +55,10 @@ class PreviewActivity : BaseActivity() {
             vvPreview.visibility = View.VISIBLE
             vvPreview.setDataSource(this, Uri.parse(path))
             vvPreview.prepareAsync{
-                mp -> mp.start()
+                mp ->
+                Handler(Looper.getMainLooper()).post{
+                    mp.start()
+                }
             }
             vvPreview.isLooping=true
         }

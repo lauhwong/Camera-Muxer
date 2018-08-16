@@ -1,6 +1,7 @@
 package com.miracles.codec.camera
 
 import android.media.MediaCodec
+import com.miracles.camera.logMEE
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -9,6 +10,16 @@ import java.util.concurrent.CopyOnWriteArrayList
 class MediaCodecLife(private val codec: MediaCodec, private val audio: Boolean) : LifeCycle {
     private val mBuf = MediaCodec.BufferInfo()
     private val mCodecCallbacks = CopyOnWriteArrayList<CodecCallback>()
+    @Volatile
+    private var mHasDataInput = false
+    @Volatile
+    private var mLowBufferCapacity = false
+
+    companion object {
+        const val INPUT_SUCCESS = 0
+        const val INVALIDATE_INDEX = -1
+        const val LOW_BUFFER_CAPACITY = -2
+    }
 
     interface CodecCallback {
         fun onInput(codec: MediaCodec, data: ByteArray, len: Int, timeStamp: Long) {}
@@ -21,19 +32,23 @@ class MediaCodecLife(private val codec: MediaCodec, private val audio: Boolean) 
      * input data to code or decode
      */
     fun input(data: ByteArray, len: Int, timeStamp: Long): Int {
+        if (mLowBufferCapacity) return LOW_BUFFER_CAPACITY
         val index = codec.dequeueInputBuffer(-1)
-        if (index < 0) return -1
+        if (index < 0) return INVALIDATE_INDEX
         val inputBuffer = codec.inputBuffers[index]
         inputBuffer.clear()
-        if (inputBuffer.capacity() < len) {
-            codec.queueInputBuffer(index, 0, 0, timeStamp, 0)
+        if (inputBuffer.capacity() < len || len <= 0) {
+            logMEE("ERROR: MediaCodeLife's capacity=${inputBuffer.capacity()} < InputLen=$len")
+            mLowBufferCapacity = true
+            codec.queueInputBuffer(index, 0, 0, timeStamp, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
             return -1
         }
+        if (!mHasDataInput) mHasDataInput = true
         inputBuffer.put(data, 0, len)
         codec.queueInputBuffer(index, 0, len, timeStamp, 0)
         callback { it.onInput(codec, data, len, timeStamp) }
         drainOutput(false)
-        return 0
+        return INPUT_SUCCESS
     }
 
     override fun start() {
@@ -41,7 +56,7 @@ class MediaCodecLife(private val codec: MediaCodec, private val audio: Boolean) 
     }
 
     override fun stop() {
-        drainOutput(true)
+        if (mHasDataInput) drainOutput(true)
         codec.stop()
         codec.release()
         mCodecCallbacks.clear()

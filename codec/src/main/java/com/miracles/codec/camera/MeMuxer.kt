@@ -9,7 +9,8 @@ import java.util.concurrent.TimeUnit
 /**
  * Created by lxw
  */
-class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: Int, val mediaMuxer: MediaMuxer, val videoCodecLife: MediaCodecLife, val audioCodecLife: MediaCodecLife) : LifeCycle, MeCodec {
+class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: Int, val mediaMuxer: MediaMuxer,
+              val videoCodecLife: MediaCodecLife?, val audioCodecLife: MediaCodecLife?) : LifeCycle, MeCodec {
     private class CodecCallbackImpl(private val meMuxer: MeMuxer, private val audio: Boolean) : MediaCodecLife.CodecCallback {
         override fun onOutputStatus(codec: MediaCodec, status: Int) {
             super.onOutputStatus(codec, status)
@@ -28,10 +29,13 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
     }
 
     private data class MediaBuf(val byteBuffer: ByteBuffer, val bufferInfo: MediaCodec.BufferInfo)
+    companion object {
+        private const val UNINITIALIZED_TRACK_INDEX = Int.MIN_VALUE + 1
+        private const val UNREACHABLE_TRACK_INDEX = Int.MIN_VALUE
+    }
 
-    //flag to identify?
-    private var mAudioTrackIndex = -1
-    private var mVideoTrackIndex = -1
+    private var mAudioTrackIndex = UNINITIALIZED_TRACK_INDEX
+    private var mVideoTrackIndex = UNINITIALIZED_TRACK_INDEX
     private var mMuxerStarted = false
     private var mAudioStopped = false
     private var mVideoStopped = false
@@ -41,8 +45,16 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
     private var mLastBalanceSecond = 0
 
     init {
-        videoCodecLife.addCallback(CodecCallbackImpl(this, false))
-        audioCodecLife.addCallback(CodecCallbackImpl(this, true))
+        videoCodecLife?.addCallback(CodecCallbackImpl(this, false))
+        if (videoCodecLife == null) {
+            mVideoTrackIndex = UNREACHABLE_TRACK_INDEX
+            mVideoStopped = true
+        }
+        audioCodecLife?.addCallback(CodecCallbackImpl(this, true))
+        if (audioCodecLife == null) {
+            mAudioTrackIndex = UNREACHABLE_TRACK_INDEX
+            mAudioStopped = true
+        }
     }
 
     @Synchronized
@@ -53,10 +65,19 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
             } else {
                 mVideoTrackIndex = mediaMuxer.addTrack(codec.outputFormat)
             }
-            if (mAudioTrackIndex != -1 && mVideoTrackIndex != -1 && !mMuxerStarted) {
-                mMuxerStarted = true
-                mediaMuxer.start()
-            }
+            startMuxer(false)
+        }
+    }
+
+    private fun startMuxer(force: Boolean) {
+        val hasTrack = if (force) {
+            mAudioTrackIndex != UNINITIALIZED_TRACK_INDEX || mVideoTrackIndex != UNINITIALIZED_TRACK_INDEX
+        } else {
+            mAudioTrackIndex != UNINITIALIZED_TRACK_INDEX && mVideoTrackIndex != UNINITIALIZED_TRACK_INDEX
+        }
+        if (hasTrack && !mMuxerStarted) {
+            mediaMuxer.start()
+            mMuxerStarted = true
         }
     }
 
@@ -136,42 +157,55 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
     @Synchronized
     private fun onEndOfOutputStream(audio: Boolean) {
         if (audio) mAudioStopped = true else mVideoStopped = true
-        if (!mMuxerStarted) return
-        if (!mMuxerStopped && mAudioStopped && mVideoStopped) {
-            logMED("EndOfOutputStream Release MeMuxer !")
-            balanceTimestamp(mVideoBuffers)
-            drainMediaBuf(true, true)
-            mLastBalanceSecond = 0
-            mediaMuxer.stop()
-            mediaMuxer.release()
-            mAudioBuffers.clear()
-            mVideoBuffers.clear()
+        if (mAudioStopped && mVideoStopped) {
+            drainCachedBuffers()
         }
     }
 
+    private fun drainCachedBuffers() {
+        if (!mMuxerStarted || mMuxerStopped) return
+        balanceTimestamp(mVideoBuffers)
+        drainMediaBuf(true, true)
+        mediaMuxer.stop()
+        mediaMuxer.release()
+        logMED("DrainCachedBuffers Of MeMuxer ! ")
+    }
 
     override fun start() {
-        videoCodecLife.start()
-        audioCodecLife.start()
+        videoCodecLife?.start()
+        audioCodecLife?.start()
     }
 
 
     override fun stop() {
-        videoCodecLife.stop()
-        audioCodecLife.stop()
+        videoCodecLife?.stop()
+        audioCodecLife?.stop()
+        if (mAudioBuffers.isNotEmpty() || mVideoBuffers.isNotEmpty()) {
+            logMED("Stop MeMuxer, CacheBuffers Not Empty !")
+            startMuxer(true)
+            drainCachedBuffers()
+        }
+        mAudioBuffers.clear()
+        mVideoBuffers.clear()
+        mMuxerStopped = false
+        mLastBalanceSecond = 0
+        logMED("MeMuxer Stopped !!! ")
     }
 
 
+    @Throws(IllegalArgumentException::class)
     override fun audioInput(bytes: ByteArray, len: Int, timeStampInNs: Long): Int {
-        synchronized(audioCodecLife) {
-            return audioCodecLife.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
+        val life = audioCodecLife ?: throw IllegalArgumentException("AudioInput AudioCodecLife is Null !")
+        synchronized(life) {
+            return life.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
         }
     }
 
-
+    @Throws(IllegalArgumentException::class)
     override fun videoInput(bytes: ByteArray, len: Int, timeStampInNs: Long): Int {
-        synchronized(videoCodecLife) {
-            return videoCodecLife.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
+        val life = videoCodecLife ?: throw IllegalArgumentException("VideoInput VideoCodecLife is Null !")
+        synchronized(life) {
+            return life.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
         }
     }
 

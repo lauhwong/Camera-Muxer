@@ -9,6 +9,7 @@ import com.miracles.camera.logMED
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.ReentrantLock
 
 /**
@@ -19,7 +20,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     private lateinit var mMuxer: MeMuxer
     private lateinit var mMp4Muxer: Mp4Muxer
     protected lateinit var mMp4Path: String
-    private var mStartTimeStamp = 0L
+    private var mStartTimestamp = AtomicLong(0)
     private var mRecordingTimeStamp = 0L
     protected var mMp4Width = 0
     protected var mMp4Height = 0
@@ -63,7 +64,9 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
     }
 
     override fun audioRecording(data: ByteArray, len: Int, timeStampInNs: Long) {
-        val timeStamp = timeStampInNs - mStartTimeStamp
+        val startUpTimestamp = mStartTimestamp.get()
+        if (startUpTimestamp <= 0) return
+        val timeStamp = timeStampInNs - startUpTimestamp
         val timeInSN = (timeStamp / 1e9).toInt()
         //reduce blocking
         if (timeInSN <= 1) {
@@ -96,7 +99,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMp4Width = mMp4Muxer.mMp4Width
         mMp4Height = mMp4Muxer.mMp4Height
         //reset base time.
-        mStartTimeStamp = timeStampInNs
+        mStartTimestamp.set(0)
         mRecordFrame = 0
         mRecordingTimeStamp = 0
         //start muxer
@@ -115,6 +118,9 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
 
     override fun onFrameRecording(cameraView: CameraView, frameBytes: CameraView.FrameBytes, width: Int, height: Int, format: Int,
                                   orientation: Int, facing: Int, timeStampInNs: Long) {
+        if (mStartTimestamp.get() <= 0) {
+            mStartTimestamp.compareAndSet(0, timeStampInNs)
+        }
         val pool = mCodeThreadPool
                 ?: throw IllegalArgumentException("RecordThreadPool is not initialized! ")
         frameBytes.consumed = true
@@ -140,9 +146,9 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                 ++mRecordFrame
                 val fpsEnsure = mMp4Muxer.params.fpsEnsure
                 if (fpsEnsure) {
-                    mRecordingTimeStamp += fpsGapInNs
+                    mRecordingTimeStamp = (mRecordFrame - 1) * fpsGapInNs
                 } else {
-                    mRecordingTimeStamp = timeStampInNs - mStartTimeStamp
+                    mRecordingTimeStamp = timeStampInNs - mStartTimestamp.get()
                 }
                 mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
                 mCompressedFrameBytesPool.releaseBytes(compressed)
@@ -204,7 +210,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMuxer.stop()
         //clear cache.
         mCompressedFrameBytesPool.clear()
-        logMED("Stop Record TotalTimeInSN=${mRecordFrame / mMp4Muxer.params.fps} ,Frame=$mRecordFrame")
+        logMED("Stop Record TotalTimeInSN=${(mRecordingTimeStamp / 1e9).toInt() + 1} ,Frames=$mRecordFrame")
     }
 
     /**

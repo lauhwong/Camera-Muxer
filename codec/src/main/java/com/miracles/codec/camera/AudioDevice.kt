@@ -47,10 +47,10 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
 
     override fun start() {
         if (mStarted.getAndSet(true)) return
-        mByteArrayPool.initialize(mPoolFactor)
         mStopped.set(false)
-        mAudioRecord.startRecording()
         mRecordThread = Thread({
+            mByteArrayPool.initialize(mPoolFactor)
+            mAudioRecord.startRecording()
             while (!mStopped.get()) {
                 val data = mByteArrayPool.getBytes()
                 val read = mAudioRecord.read(data, 0, data.size)
@@ -58,18 +58,19 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
                     callback { audioRecording(data, read, SystemClock.elapsedRealtimeNanos()) }
                 }
             }
+            mAudioRecord.stop()
+            mAudioRecord.release()
         }, "MediaAudioRecord")
         mRecordThread?.start()
     }
 
     override fun stop() {
-        if (!mStarted.getAndSet(false)) return
+        if (!mStarted.get()) return
         if (mStopped.getAndSet(true)) return
-        mAudioRecord.stop()
-        mAudioRecord.release()
         mRecordThread?.join()
         mByteArrayPool.clear()
         mRecordThread = null
+        mStarted.set(false)
     }
 
     fun release(bytes: ByteArray) {
