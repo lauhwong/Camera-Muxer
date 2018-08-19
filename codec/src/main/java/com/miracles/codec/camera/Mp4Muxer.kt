@@ -57,7 +57,8 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
     internal val mMp4Path: String
     internal val mMp4Width: Int
     internal val mMp4Height: Int
-    internal var mSupportDeprecated420 = false
+    internal var mSupportI420 = false
+    internal var mSupportNV12 = false
 
     init {
         mMp4Width = params.width
@@ -66,23 +67,29 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
         val videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, mMp4Width, mMp4Height)
         val videoCodec = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE)
         val capabilitiesForType = videoCodec.codecInfo.getCapabilitiesForType(VIDEO_MIME_TYPE)
-        var supportSemi420 = false
+        val i420s = arrayOf(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar)
+        val nv12s = arrayOf(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
+                MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar,
+                MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar)
         for (key in capabilitiesForType.colorFormats) {
-            if (key == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar) {
-                mSupportDeprecated420 = true
-            } else if (key == MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar) {
-                supportSemi420 = true
+            if (i420s.contains(key) && !mSupportI420) {
+                mSupportI420 = true
+            } else if (nv12s.contains(key) && !mSupportNV12) {
+                mSupportNV12 = true
             }
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
         } else {
             //part of hw device is not support Deprecated420 (wtf...)
-            if (supportSemi420) mSupportDeprecated420 = false
-            if (mSupportDeprecated420) {
-                videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar)
-            } else {
-                videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar)
+            if (mSupportNV12) mSupportI420 = false
+            val formats = if (mSupportI420) i420s else nv12s
+            for (key in formats) {
+                if (capabilitiesForType.colorFormats.contains(key)) {
+                    videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, key)
+                    break
+                }
             }
         }
         videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, params.videoBitrate)

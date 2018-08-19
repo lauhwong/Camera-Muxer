@@ -96,7 +96,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMp4Muxer.mAudioDevice.start()
         //bytes pool of  compressed
         if (mCompressedFrameBytesPool == ByteArrayPool.EMPTY) {
-            val f = if (mMp4Muxer.mSupportDeprecated420) 1 else 2
+            val f = if (mMp4Muxer.mSupportI420) 1 else if (mMp4Muxer.mSupportNV12) 2 else 1
             val mp4Size = mMp4Width * mMp4Height * 3 / 2
             mCompressedFrameBytesPool = ByteArrayPool(f * codePoolSize, mp4Size)
         }
@@ -106,6 +106,9 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
 
     override fun onFrameRecording(cameraView: CameraView, frameBytes: CameraView.FrameBytes, width: Int, height: Int, format: Int,
                                   orientation: Int, facing: Int, timeStampInNs: Long) {
+        if (mReleased.get() || (!mMp4Muxer.mSupportNV12 && !mMp4Muxer.mSupportI420)) {
+            return
+        }
         if (mStartTimestamp.get() <= 0) {
             mStartTimestamp.compareAndSet(0, timeStampInNs)
         }
@@ -125,7 +128,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                 } else if (format == ImageFormat.YV12) {
                     codeFormat = LibYuvUtils.FOURCC_YV12
                 }
-                val compressed = compress(data, data.size, orientation, facing, width, height, codeFormat, mMp4Muxer.mSupportDeprecated420)
+                val compressed = compress(data, data.size, orientation, facing, width, height, codeFormat, mMp4Muxer.mSupportI420)
                 //2.release bytes.
                 frameBytes.bytesPool.releaseBytes(data)
                 //3.wait for last frame to complete.
@@ -173,7 +176,7 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
         mMuxer.stop()
         //clear cache.
         mCompressedFrameBytesPool.clear()
-        logMED("Stop Record TotalTimeInSN=${(mRecordingTimeStamp / 1e9).toInt() + 1} ,Frames=$mRecordFrame")
+        logMED("Stop Record TotalTimeInSN=${(mRecordingTimeStamp / 1e9)} ,Frames=$mRecordFrame")
     }
 
     /**
