@@ -6,6 +6,8 @@ import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.os.Build
+import com.miracles.camera.logMED
+import com.miracles.camera.logMEE
 import java.io.File
 
 /**
@@ -67,35 +69,46 @@ class Mp4Muxer(internal val ctx: Context, internal val params: Params, internal 
         val videoFormat = MediaFormat.createVideoFormat(VIDEO_MIME_TYPE, mMp4Width, mMp4Height)
         val videoCodec = MediaCodec.createEncoderByType(VIDEO_MIME_TYPE)
         val capabilitiesForType = videoCodec.codecInfo.getCapabilitiesForType(VIDEO_MIME_TYPE)
+        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, params.videoBitrate)
+        videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, params.fps)
+        videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5)
         val i420s = arrayOf(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Planar,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedPlanar)
         val nv12s = arrayOf(MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420SemiPlanar,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420PackedSemiPlanar,
                 MediaCodecInfo.CodecCapabilities.COLOR_TI_FormatYUV420PackedSemiPlanar)
+        val supportedColorFormats = arrayListOf<Int>()
         for (key in capabilitiesForType.colorFormats) {
-            if (i420s.contains(key) && !mSupportI420) {
+            if (i420s.contains(key)) {
+                supportedColorFormats.add(key)
                 mSupportI420 = true
-            } else if (nv12s.contains(key) && !mSupportNV12) {
+            } else if (nv12s.contains(key)) {
+                supportedColorFormats.add(key)
                 mSupportNV12 = true
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
-        } else {
-            //part of hw device is not support Deprecated420 (wtf...)
-            if (mSupportNV12) mSupportI420 = false
-            val formats = if (mSupportI420) i420s else nv12s
-            for (key in formats) {
-                if (capabilitiesForType.colorFormats.contains(key)) {
-                    videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, key)
-                    break
-                }
+        var handled = false
+        for (key in supportedColorFormats) {
+            try {
+                videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, key)
+                videoCodec.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+                mSupportI420 = i420s.contains(key)
+                mSupportNV12 = nv12s.contains(key)
+                handled = true
+                break
+            } catch (ex: Throwable) {
+                logMEE("KEY_COLOR_FORMAT=$key", ex)
             }
         }
-        videoFormat.setInteger(MediaFormat.KEY_BIT_RATE, params.videoBitrate)
-        videoFormat.setInteger(MediaFormat.KEY_FRAME_RATE, params.fps)
-        videoFormat.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 5)
-        videoCodec.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        if (!handled) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                videoFormat.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatYUV420Flexible)
+                videoCodec.configure(videoFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+            } else {
+                throw IllegalArgumentException("Can't Find VideoCodec Encoder...")
+            }
+        }
+        logMED("mMp4Width=$mMp4Width ,mMp4Height=$mMp4Height mSupportI420=$mSupportI420 mSupportNV12=$mSupportNV12")
         val videoCodecLife = MediaCodecLife(videoCodec, false)
         //audio
         val audioFormat = MediaFormat.createAudioFormat(AUDIO_MIME_TYPE, params.audioSampleRate, params.audioChannelCount)

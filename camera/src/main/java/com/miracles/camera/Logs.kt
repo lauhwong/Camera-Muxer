@@ -6,8 +6,8 @@ import android.util.Log
  * Log extensions.
  */
 const val LOG_TAG = "ME-MEDIA"//javaClass.simpleName
-
-//val logFile = File(File(Environment.getExternalStorageDirectory(), "camera&muxer"), "me.log")
+//val dir=File(Environment.getExternalStorageDirectory(), "camera&muxer")
+//val logFile = File(dir, "me.log")
 fun Any.logMED(msg: String) {
     Log.d(LOG_TAG, msg)
 //    logFile.appendBytes("$msg \r\n".toByteArray())

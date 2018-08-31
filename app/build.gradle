@@ -38,7 +38,7 @@ project.android.applicationVariants.all { variant ->
     def apkName = 'CameraMuxer'
     def taskName = variant.name
     tasks.all {
-        if ("assemble${taskName.capitalize()}".equalsIgnoreCase(it.name))  {
+        if ("assemble${taskName.capitalize()}".equalsIgnoreCase(it.name) && it.name.toLowerCase().contains("release")) {
             it.doLast {
                 copy {
                     from variant.outputs[0].outputFile
