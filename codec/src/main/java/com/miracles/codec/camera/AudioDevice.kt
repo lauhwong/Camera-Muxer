@@ -49,7 +49,6 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
         if (mStarted.getAndSet(true)) return
         mStopped.set(false)
         mRecordThread = Thread({
-            mByteArrayPool.initialize(mPoolFactor)
             mAudioRecord.startRecording()
             while (!mStopped.get()) {
                 val data = mByteArrayPool.getBytes()

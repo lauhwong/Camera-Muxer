@@ -12,25 +12,34 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     }
 
     private val mPool = LinkedBlockingDeque<ByteArray>(maxSize)
+    private var mExistInstanceCount = 0
+    private val mInstanceCountLock = ByteArray(0)
 
-    constructor(maxSize: Int, perSize: Int, factor: Int) : this(maxSize, perSize) {
-        initialize(factor)
-    }
-
-    fun initialize(factor: Int) {
-        if (factor <= 0) return
-        for (x in 0..factor) {
-            if (!releaseBytes(ByteArray(perSize))) {
-                break
-            }
+    private fun newBytesArray(): ByteArray? {
+        synchronized(mInstanceCountLock) {
+            if (mExistInstanceCount > maxSize) return null
+            mExistInstanceCount++
+            return ByteArray(perSize)
         }
     }
 
     fun getBytes(): ByteArray {
-        return getBytes(0, TimeUnit.MILLISECONDS)
+        var result = getBytes(0, TimeUnit.MILLISECONDS)
+        if (result == null) {
+            result = getBytes(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        }
+        return result ?: throw NullPointerException("force get bytes is null.")
     }
 
-    fun getBytes(timeout: Long, unit: TimeUnit): ByteArray {
+    fun getBytes(timeout: Long, unit: TimeUnit): ByteArray? {
+        var result = hasAvailableBytes(timeout, unit)
+        if (result == null) {
+            result = newBytesArray()
+        }
+        return result
+    }
+
+    private fun hasAvailableBytes(timeout: Long, unit: TimeUnit): ByteArray? {
         var result: ByteArray? = null
         synchronized(mPool) {
             try {
@@ -38,7 +47,7 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
             } catch (ignored: InterruptedException) {
             }
         }
-        return result ?: ByteArray(perSize)
+        return result
     }
 
     fun releaseBytes(bytes: ByteArray): Boolean {
@@ -55,6 +64,9 @@ class ByteArrayPool(val maxSize: Int, val perSize: Int) {
     fun clear() {
         synchronized(mPool) {
             mPool.clear()
+        }
+        synchronized(mInstanceCountLock) {
+            mExistInstanceCount = 0
         }
     }
 
