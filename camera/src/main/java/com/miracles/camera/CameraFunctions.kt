@@ -110,7 +110,10 @@ abstract class CameraFunctions {
 
         fun onStartCapturePicture() {}
 
-        fun onPictureTaken(data: ByteArray) {}
+        fun onPictureCaptured(data: ByteArray, len: Int, width: Int,
+                              height: Int, format: Int, orientation: Int, facing: Int, timeStampInNs: Long) {
+
+        }
 
         fun onStartRecordingFrame(timeStampInNs: Long) {}
         /**

@@ -60,8 +60,9 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         }
         mCamera?.startPreview()
         mShowingPreview = true
+        //what if recording frame and then  switch cameras ,back to record state.
         if (isRecordingFrame()) {
-            resumeFrameRecording()
+            previewFrameWithBuffers()
         }
         return true
     }
@@ -243,29 +244,20 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         if (!isCameraOpened()) {
             throw IllegalStateException("Camera is not ready. Call start() before takePicture().")
         }
-        val camera = mCamera ?: return
-        if (mAutoFocus) {
-            camera.cancelAutoFocus()
-            camera.autoFocus { _, _ ->
-                takePictureInternal()
-            }
-        } else {
-            takePictureInternal()
-        }
+        startTakePictureInternal()
     }
 
-    private fun takePictureInternal() {
-        if (!mPictureCaptureInProgress.getAndSet(true)) {
-            mCamera?.takePicture({
-                callback.onStartCapturePicture()
-            }, null, { data, camera ->
-                mPictureCaptureInProgress.set(false)
-                callback.onPictureTaken(data)
-                camera.cancelAutoFocus()
-                camera.startPreview()
-            })
-        }
+    private fun startTakePictureInternal() {
+        if (mPictureCaptureInProgress.getAndSet(true)) return
+        callback.onStartCapturePicture()
+        previewFrameWithBuffers()
+    }
 
+    private fun stopTakePictureInternal() {
+        if (!mPictureCaptureInProgress.get()) return
+        mCamera?.setPreviewCallbackWithBuffer(null)
+        mPreviewBytesPool.clear()
+        mPictureCaptureInProgress.set(false)
     }
 
     override fun startRecord() {
@@ -274,7 +266,7 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         if (!getAutoFocus()) {
             setAutoFocus(true)
         }
-        resumeFrameRecording()
+        previewFrameWithBuffers()
     }
 
     private fun recordDiscardGapInNano(): Long {
@@ -285,35 +277,45 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
         return (1e9 / (previewFpsRange[0] + previewFpsRange[1]) * 1000 * 2).toLong()
     }
 
-    private fun resumeFrameRecording() {
+    /**
+     * set preview buffer 2 camera to get data from callback
+     */
+    private fun previewFrameWithBuffers() {
         val cam = mCamera ?: return
         val previewSize = cam.parameters.previewSize
         val discardGapInNano = recordDiscardGapInNano()
         val sizeInByte = previewSize.width * previewSize.height * 3 / 2
         val maxFactor = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).bytesPoolSize(com.miracles.camera.Size(previewSize.width, previewSize.height))
         if (mPreviewBytesPool.perSize != sizeInByte) {
+            mPreviewBytesPool.clear()
             mPreviewBytesPool = ByteArrayPool(maxFactor, sizeInByte)
         }
-        mPreviewBytesPool.clear()
         for (x in 0..1) {
             cam.addCallbackBuffer(mPreviewBytesPool.getBytes())
         }
         val format = cam.parameters.previewFormat
         logMED("discardGapInNano is $discardGapInNano")
         cam.setPreviewCallbackWithBuffer { data, _ ->
-            if (!mRecordingFrameInProgress.get() || data?.size ?: 0 == 0) {
-                cam.addCallbackBuffer(data)
-                return@setPreviewCallbackWithBuffer
+            val dataValidate = data?.size ?: 0 > 0
+            when {
+                mPictureCaptureInProgress.get() && dataValidate -> {
+                    callback.onPictureCaptured(data, data.size, previewSize.width, previewSize.height, format,
+                            calcCameraRotation(displayOrientation), facing, timeStampInNs())
+                    stopTakePictureInternal()
+                    return@setPreviewCallbackWithBuffer
+                }
+                mRecordingFrameInProgress.get() && dataValidate -> {
+                    val reused = mPreviewBytesPool.getBytes(discardGapInNano, TimeUnit.NANOSECONDS)
+                            ?: let {
+                                cam.addCallbackBuffer(data)
+                                return@setPreviewCallbackWithBuffer
+                            }
+                    callback.onFrameRecording(data, data.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
+                            calcCameraRotation(displayOrientation), facing, timeStampInNs())
+                    cam.addCallbackBuffer(reused)
+                }
+                else -> cam.addCallbackBuffer(data)
             }
-
-            val reused = mPreviewBytesPool.getBytes(discardGapInNano, TimeUnit.NANOSECONDS)
-                    ?: let {
-                        cam.addCallbackBuffer(data)
-                        return@setPreviewCallbackWithBuffer
-                    }
-            callback.onFrameRecording(data, data.size, mPreviewBytesPool, previewSize.width, previewSize.height, format,
-                    calcCameraRotation(displayOrientation), facing, timeStampInNs())
-            cam.addCallbackBuffer(reused)
         }
     }
 

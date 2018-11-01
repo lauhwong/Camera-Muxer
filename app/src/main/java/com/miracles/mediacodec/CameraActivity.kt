@@ -52,10 +52,13 @@ class CameraActivity : BaseActivity() {
         })
         //picture callback
         cameraView.addCallback(object : CapturePictureHandler(picturePath) {
-            override fun onPictureTaken(cameraView: CameraView, data: ByteArray) {
-                super.onPictureTaken(cameraView, data)
-                logMED("onPictureTaken")
-                PreviewActivity.start(this@CameraActivity, capturedPath!!, true)
+            override fun onPictureCapturedResult(cameraView: CameraView, path: String, ex: Throwable?) {
+                super.onPictureCapturedResult(cameraView, path, ex)
+                if (ex != null) {
+                    logMEE("onPictureTaken failed.", ex)
+                } else {
+                    PreviewActivity.start(this@CameraActivity, path, true)
+                }
             }
         })
     }
@@ -64,7 +67,7 @@ class CameraActivity : BaseActivity() {
         val display = resources.displayMetrics
         logMED("display width=${display.widthPixels} ,height=${display.heightPixels}")
         val aspectRatio = display.heightPixels.toFloat() / display.widthPixels
-        return MChooseStrategy(16/9f)
+        return MChooseStrategy(16 / 9f)
     }
 
     private class MChooseStrategy(val aspectRatio: Float) : ChooseSizeStrategy {
@@ -116,7 +119,7 @@ class CameraActivity : BaseActivity() {
                 this.path = path
                 this.width = frameHeight / 2
                 this.height = frameWidth / 2
-                this.balanceTimestampGapInSeconds=5
+                this.balanceTimestampGapInSeconds = 5
             }
             val audioParam = AudioDevice.Params()
             val audioDevice = AudioDevice.create(audioParam)

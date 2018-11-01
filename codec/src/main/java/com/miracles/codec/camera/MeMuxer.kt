@@ -3,7 +3,9 @@ package com.miracles.codec.camera
 import android.media.MediaCodec
 import android.media.MediaMuxer
 import com.miracles.camera.logMED
+import com.miracles.camera.logMEE
 import java.nio.ByteBuffer
+import java.util.TreeSet
 import java.util.concurrent.TimeUnit
 
 /**
@@ -36,9 +38,13 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
 
     private var mAudioTrackIndex = UNINITIALIZED_TRACK_INDEX
     private var mVideoTrackIndex = UNINITIALIZED_TRACK_INDEX
+    @Volatile
     private var mMuxerStarted = false
+    @Volatile
     private var mAudioStopped = false
+    @Volatile
     private var mVideoStopped = false
+    @Volatile
     private var mMuxerStopped = false
     private val mAudioBuffers = ArrayList<MediaBuf>()
     private val mVideoBuffers = ArrayList<MediaBuf>()
@@ -76,8 +82,8 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
             mAudioTrackIndex != UNINITIALIZED_TRACK_INDEX && mVideoTrackIndex != UNINITIALIZED_TRACK_INDEX
         }
         if (hasTrack && !mMuxerStarted) {
-            mediaMuxer.start()
             mMuxerStarted = true
+            mediaMuxer.start()
         }
     }
 
@@ -195,7 +201,8 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
 
     @Throws(IllegalArgumentException::class)
     override fun audioInput(bytes: ByteArray, len: Int, timeStampInNs: Long): Int {
-        val life = audioCodecLife ?: throw IllegalArgumentException("AudioInput AudioCodecLife is Null !")
+        val life = audioCodecLife
+                ?: throw IllegalArgumentException("AudioInput AudioCodecLife is Null !")
         synchronized(life) {
             return life.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
         }
@@ -203,7 +210,8 @@ class MeMuxer(val balanceTimestamp: Boolean, val balanceTimestampGapInSeconds: I
 
     @Throws(IllegalArgumentException::class)
     override fun videoInput(bytes: ByteArray, len: Int, timeStampInNs: Long): Int {
-        val life = videoCodecLife ?: throw IllegalArgumentException("VideoInput VideoCodecLife is Null !")
+        val life = videoCodecLife
+                ?: throw IllegalArgumentException("VideoInput VideoCodecLife is Null !")
         synchronized(life) {
             return life.input(bytes, len, TimeUnit.NANOSECONDS.toMicros(timeStampInNs))
         }

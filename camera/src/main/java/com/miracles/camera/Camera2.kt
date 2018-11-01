@@ -78,7 +78,7 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
                 val buffer = planes[0].buffer
                 val data = ByteArray(buffer.remaining())
                 buffer.get(data)
-                callback.onPictureTaken(data)
+//                callback.onPictureTaken(data)
             }
         }
     }
@@ -343,7 +343,8 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
     private fun prepareImageReader() {
         mPictureImageReader?.close()
         mRecordImageReader?.close()
-        val sensorOrientation = mCameraCharacteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        val sensorOrientation = mCameraCharacteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION)
+                ?: 0
         val pictureSize = getCameraSizeStrategy(STRATEGY_PICTURE_SIZE).chooseSize(preview, displayOrientation, sensorOrientation, facing, mPictureSizes)
         cacheCameraSize(SIZE_PICTURE, pictureSize)
         mPictureImageReader = ImageReader.newInstance(pictureSize.width, pictureSize.height, mImageFormat, 2)
@@ -367,7 +368,8 @@ open class Camera2(preview: CameraPreview, ctx: Context, callback: CameraFunctio
         val pir = mPictureImageReader
         val rir = mRecordImageReader
         if (!isCameraOpened() || !preview.isReady() || pir == null || rir == null) return
-        val sensorOrientation = mCameraCharacteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 0
+        val sensorOrientation = mCameraCharacteristics?.get(CameraCharacteristics.SENSOR_ORIENTATION)
+                ?: 0
         val previewSize = getCameraSizeStrategy(STRATEGY_PREVIEW_SIZE).chooseSize(preview, displayOrientation, sensorOrientation, facing, mPreviewSizes)
         cacheCameraSize(SIZE_PREVIEW, previewSize)
         preview.setBufferSize(previewSize.width, previewSize.height)

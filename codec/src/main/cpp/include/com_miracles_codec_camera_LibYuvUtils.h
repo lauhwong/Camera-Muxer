@@ -20,6 +20,9 @@ JNIEXPORT jint JNICALL Java_com_miracles_codec_camera_LibYuvUtils_scaleRotationA
         (JNIEnv *, jclass, jbyteArray, jint, jbyteArray, jint, jint, jint, jint, jint, jint, jboolean, jint);
 
 JNIEXPORT jint JNICALL Java_com_miracles_codec_camera_LibYuvUtils_i420ToNV12(JNIEnv *, jclass, jbyteArray, jint, jbyteArray, jint, jint);
+
+JNIEXPORT jint JNICALL Java_com_miracles_codec_camera_LibYuvUtils_i420ToNV21(JNIEnv *, jclass, jbyteArray, jint, jbyteArray, jint, jint);
+
 /*
  * Class:     com_miracles_codec_camera_LibYuvUtils
  * Method:    convertToARGB

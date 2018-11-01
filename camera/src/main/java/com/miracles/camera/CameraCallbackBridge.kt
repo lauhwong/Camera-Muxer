@@ -26,8 +26,8 @@ internal class CameraCallbackBridge(val cameraView: CameraView) : CallbackBridge
         callback { onStartCapturePicture(cameraView) }
     }
 
-    override fun onPictureTaken(data: ByteArray) {
-        callback { onPictureTaken(cameraView, data) }
+    override fun onPictureCaptured(data: ByteArray, len: Int, width: Int, height: Int, format: Int, orientation: Int, facing: Int, timeStampInNs: Long) {
+        callback { onPictureCaptured(cameraView, data, len, width, height, format, orientation, facing, timeStampInNs) }
     }
 
     override fun onStartRecordingFrame(timeStampInNs: Long) {

@@ -352,11 +352,14 @@ class CameraView : FrameLayout {
 
         fun onCameraClosed(cameraView: CameraView) {}
         /**
-         * result jpeg data.compressed
+         * result uncompressed yuv data
          */
         fun onStartCapturePicture(cameraView: CameraView) {}
 
-        fun onPictureTaken(cameraView: CameraView, data: ByteArray) {}
+        fun onPictureCaptured(cameraView: CameraView,data: ByteArray, len: Int, width: Int,
+                              height: Int, format: Int, orientation: Int, facing: Int, timeStampInNs: Long) {
+
+        }
         /**
          * result uncompressed yuv data.
          */

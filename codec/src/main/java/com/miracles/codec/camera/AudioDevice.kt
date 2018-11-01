@@ -12,10 +12,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Created by lxw
  */
 class AudioDevice private constructor(private val params: Params) : CallbackBridge<AudioDevice.Callback>(), LifeCycle {
-    private var mStarted = AtomicBoolean(false)
-    private val mStopped = AtomicBoolean(false)
-    private var mAudioRecord: AudioRecord
-    private var mRecordThread: Thread? = null
+    private var mStartFlag = AtomicBoolean(false)
+    private var mStopFlag = AtomicBoolean(true)
+    @Volatile
+    private var mAudioRecordInitializedFlag = false
+    private var mAudioThread: Thread? = null
+    private val mAudioThreadLock = Object()
     private val mPoolFactor = 2
     //Note:do not initialized for bufSize...cause bug below 21....
     private val mByteArrayPool: ByteArrayPool = ByteArrayPool(mPoolFactor, 2048)
@@ -37,39 +39,59 @@ class AudioDevice private constructor(private val params: Params) : CallbackBrid
     }
 
     init {
-        val bufSize = AudioRecord.getMinBufferSize(params.audioSampleRate, params.audioChannel, params.audioFormat)
-        try {
-            mAudioRecord = AudioRecord(params.audioSource, params.audioSampleRate, params.audioChannel, params.audioFormat, bufSize)
-        } catch (ex: Throwable) {
-            throw RuntimeException("AudioDevice init exception!", ex)
-        }
-    }
-
-    override fun start() {
-        if (mStarted.getAndSet(true)) return
-        mStopped.set(false)
-        mRecordThread = Thread({
-            mAudioRecord.startRecording()
-            while (!mStopped.get()) {
+        mAudioThread = Thread({
+            val audioRecord: AudioRecord
+            val bufSize = AudioRecord.getMinBufferSize(params.audioSampleRate, params.audioChannel, params.audioFormat)
+            try {
+                audioRecord = AudioRecord(params.audioSource, params.audioSampleRate, params.audioChannel, params.audioFormat, bufSize)
+            } catch (ex: Throwable) {
+                return@Thread
+            }
+            if (audioRecord.state != AudioRecord.STATE_INITIALIZED) {
+                return@Thread
+            }
+            mAudioRecordInitializedFlag = true
+            while (!mStartFlag.get()) {
+                try {
+                    synchronized(mAudioThreadLock) {
+                        mAudioThreadLock.wait()
+                    }
+                } catch (ex: InterruptedException) {
+                    return@Thread
+                }
+            }
+            audioRecord.startRecording()
+            while (!mStopFlag.get()) {
                 val data = mByteArrayPool.getBytes()
-                val read = mAudioRecord.read(data, 0, data.size)
+                val read = audioRecord.read(data, 0, data.size)
                 if (read > 0) {
                     callback { audioRecording(data, read, SystemClock.elapsedRealtimeNanos()) }
                 }
             }
-            mAudioRecord.stop()
-            mAudioRecord.release()
+            audioRecord.stop()
+            audioRecord.release()
         }, "MediaAudioRecord")
-        mRecordThread?.start()
+        mAudioThread?.start()
+    }
+
+    override fun start() {
+        if (mStartFlag.getAndSet(true)) return
+        mStopFlag.set(false)
+        synchronized(mAudioThreadLock) {
+            mAudioThreadLock.notifyAll()
+        }
     }
 
     override fun stop() {
-        if (!mStarted.get()) return
-        if (mStopped.getAndSet(true)) return
-        mRecordThread?.join()
+        if (mStopFlag.getAndSet(true)) return
+        synchronized(mAudioThreadLock) {
+            mAudioThreadLock.notifyAll()
+        }
+        if (mAudioRecordInitializedFlag) {
+            mAudioThread?.join()
+        }
         mByteArrayPool.clear()
-        mRecordThread = null
-        mStarted.set(false)
+        mAudioThread = null
     }
 
     fun release(bytes: ByteArray) {

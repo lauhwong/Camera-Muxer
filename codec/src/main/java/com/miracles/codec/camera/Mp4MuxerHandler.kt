@@ -136,10 +136,10 @@ abstract class Mp4MuxerHandler : AudioDevice.Callback, CameraView.Callback {
                 //4.code compressed data to Mp4.
                 ++mRecordFrame
                 val fpsEnsure = mMp4Muxer.params.fpsEnsure
-                if (fpsEnsure) {
-                    mRecordingTimeStamp = (mRecordFrame - 1) * fpsGapInNs
+                mRecordingTimeStamp = if (fpsEnsure) {
+                    (mRecordFrame - 1) * fpsGapInNs
                 } else {
-                    mRecordingTimeStamp = timeStampInNs - mStartTimestamp.get()
+                    timeStampInNs - mStartTimestamp.get()
                 }
                 mMuxer.videoInput(compressed, compressed.size, mRecordingTimeStamp)
                 mCompressedFrameBytesPool.releaseBytes(compressed)

@@ -117,6 +117,8 @@ public class LibYuvUtils {
      */
     public native static int i420ToNV12(byte[] samples, int sampleSize, byte[] result, int width, int height);
 
+    public native static int i420ToNV21(byte[] samples, int sampleSize, byte[] result, int width, int height);
+
     public native static int convertToARGB(byte[] samples, int sampleSize, byte[] dst, int dst_stride, int cropX, int cropY, int srcWidth, int srcHeight,
                                            int cropWidth, int cropHeight, int rotation, int format);
 
