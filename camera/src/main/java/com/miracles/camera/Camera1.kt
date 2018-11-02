@@ -330,8 +330,9 @@ class Camera1(preview: CameraPreview, callback: CameraFunctions.Callback) : Came
     override fun isCameraOpened() = mCamera != null
 
     private fun releaseCamera() {
-        val cam = mCamera ?: return
-        cam.release()
+        mCamera?.apply {
+            release()
+        }
         mCamera = null
         mCameraParameters = null
         callback.onCameraClosed()

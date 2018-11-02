@@ -15,6 +15,7 @@ abstract class CameraDevice(val preview: CameraPreview, val callback: CameraFunc
     protected val mRecordingFrameInProgress = AtomicBoolean(false)
     protected val mSizeStrategyMaps = SparseArray<ChooseSizeStrategy>()
     protected val mSizeMaps = SparseArray<Size>()
+    protected val mDefaultChooseSizeStrategy = ChooseSizeStrategy.screenAspectRatioStrategy(preview.getView().context)
 
     override fun isCapturingPicture() = mPictureCaptureInProgress.get()
 
@@ -36,9 +37,9 @@ abstract class CameraDevice(val preview: CameraPreview, val callback: CameraFunc
         val oldStrategy = mSizeStrategyMaps[kind]
         if (oldStrategy != null) return oldStrategy
         return when (kind) {
-            STRATEGY_PREVIEW_SIZE -> ChooseSizeStrategy.AspectRatioStrategy(16.toFloat() / 9, 1920, 1080)
-            STRATEGY_PICTURE_SIZE -> ChooseSizeStrategy.LargestSizeStrategy()
-            STRATEGY_RECORD_PREVIEW_SIZE -> ChooseSizeStrategy.AspectRatioStrategy(16.toFloat() / 9, 1920, 1080)
+            STRATEGY_PREVIEW_SIZE -> mDefaultChooseSizeStrategy
+            STRATEGY_PICTURE_SIZE -> mDefaultChooseSizeStrategy
+            STRATEGY_RECORD_PREVIEW_SIZE -> mDefaultChooseSizeStrategy
             else -> throw IllegalArgumentException("非法参数 kind=$kind !")
         }
     }

@@ -125,27 +125,42 @@ class CameraView : FrameLayout {
 
     /**
      * start camera and ready 2 preview.
-     *
-     * @throws RuntimeException
      */
-    fun start() {
+    fun start(): Boolean {
         mCallbacks.startBackgroundThread()
-        if (!mDeviceImpl.open()) {
-            val saveState = onSaveInstanceState()
-            // Camera2 uses legacy hardware layer; fall back to Camera1
-            mDeviceImpl = Camera1(previewImpl, mCallbacks)
-            onRestoreInstanceState(saveState)
-            mDeviceImpl.open()
+        try {
+            if (!mDeviceImpl.open()) {
+                val saveState = onSaveInstanceState()
+                // Camera2 uses legacy hardware layer; fall back to Camera1
+                mDeviceImpl = Camera1(previewImpl, mCallbacks)
+                onRestoreInstanceState(saveState)
+                mDeviceImpl.open()
+            }
+        } catch (ex: Throwable) {
+            logMEE("start camera error.", ex)
+            return false
         }
+        logMED("start success!!!")
+        return true
     }
 
-    fun stop() {
-        if (isRecordingFrame()) {
-            mDeviceImpl.stopRecord()
+    /**
+     * stop and close camera
+     */
+    fun stop(): Boolean {
+        try {
+            if (isRecordingFrame()) {
+                mDeviceImpl.stopRecord()
+            }
+            mDeviceImpl.close()
+        } catch (ex: Throwable) {
+            logMEE("stop camera failed", ex)
+            return false
+        } finally {
+            mCallbacks.stopBackgroundThread()
         }
-        mDeviceImpl.close()
-        mCallbacks.stopBackgroundThread()
-        logMED("stop success!!!")
+        logMED("stop camera success")
+        return true
     }
 
     /**
@@ -356,10 +371,11 @@ class CameraView : FrameLayout {
          */
         fun onStartCapturePicture(cameraView: CameraView) {}
 
-        fun onPictureCaptured(cameraView: CameraView,data: ByteArray, len: Int, width: Int,
+        fun onPictureCaptured(cameraView: CameraView, data: ByteArray, len: Int, width: Int,
                               height: Int, format: Int, orientation: Int, facing: Int, timeStampInNs: Long) {
 
         }
+
         /**
          * result uncompressed yuv data.
          */

@@ -42,7 +42,7 @@ class CameraActivity : BaseActivity() {
         cameraControls.bindCameraView(cameraView)
         val picturePath = File(getSavedDir(), "me.jpeg").absolutePath
         //record preview size
-        cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE, getRecordStrategy())
+        //cameraView.setCameraSizeStrategy(CameraFunctions.STRATEGY_RECORD_PREVIEW_SIZE, getRecordStrategy())
         //mp4Callback
         cameraView.addCallback(object : MMP4MuxerHandler(this@CameraActivity, getSavedDir()) {
             override fun onStopRecordingFrame(cameraView: CameraView, timeStampInNs: Long) {
@@ -140,7 +140,10 @@ class CameraActivity : BaseActivity() {
 
     override fun onResume() {
         super.onResume()
-        cameraView.start()
+        val success = cameraView.start()
+        if (!success) {
+            finish()
+        }
     }
 
     override fun onPause() {

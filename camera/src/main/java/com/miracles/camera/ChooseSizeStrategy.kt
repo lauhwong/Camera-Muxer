@@ -1,13 +1,30 @@
 package com.miracles.camera
 
+import android.content.Context
+import android.os.Build
 import android.os.Parcel
 import android.os.Parcelable
+import android.util.DisplayMetrics
 import android.view.Surface
+import android.view.WindowManager
 
 /**
  * Created by lxw
  */
 interface ChooseSizeStrategy : Parcelable {
+    companion object {
+        fun screenAspectRatioStrategy(context: Context): AspectRatioStrategy {
+            var displayMetrics = DisplayMetrics()
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+                val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                windowManager.defaultDisplay.getRealMetrics(displayMetrics)
+            } else {
+                displayMetrics = context.resources.displayMetrics
+            }
+            return AspectRatioStrategy(displayMetrics.heightPixels.toFloat() / displayMetrics.widthPixels
+                    , displayMetrics.heightPixels, displayMetrics.widthPixels)
+        }
+    }
 
     fun chooseSize(preview: CameraPreview, displayOrientation: Int, cameraSensorOrientation: Int, facing: Int, sizes: List<Size>): Size
 
@@ -19,7 +36,7 @@ interface ChooseSizeStrategy : Parcelable {
         }
 
         override fun chooseSize(preview: CameraPreview, displayOrientation: Int, cameraSensorOrientation: Int, facing: Int, sizes: List<Size>): Size {
-            return sizes.sortedDescending().first()
+            return sizes.asSequence().sortedDescending().first()
         }
 
         override fun equals(other: Any?): Boolean {
